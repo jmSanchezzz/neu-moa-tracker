@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -31,19 +32,24 @@ import {
   FileSpreadsheet,
   AlertCircle,
   Loader2,
-  PlusCircle
+  PlusCircle,
+  Database
 } from "lucide-react";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy } from "firebase/firestore";
+import { collection, query, orderBy, doc, setDoc, writeBatch } from "firebase/firestore";
 import { AddMoaDialog } from "@/components/moa/add-moa-dialog";
+import { MOCK_MOAS } from "@/lib/mock-data";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const db = useFirestore();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [collegeFilter, setCollegeFilter] = useState("all");
   const [industryFilter, setIndustryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [isSeeding, setIsSeeding] = useState(false);
 
   // Real-time Firestore Collection
   const moaQuery = useMemoFirebase(() => {
@@ -84,6 +90,31 @@ export default function DashboardPage() {
     });
   }, [moas, searchQuery, collegeFilter, industryFilter, statusFilter, isStudent, isFaculty]);
 
+  const seedDatabase = async () => {
+    if (!db || isSeeding) return;
+    setIsSeeding(true);
+    try {
+      const batch = writeBatch(db);
+      MOCK_MOAS.forEach((moa) => {
+        const docRef = doc(collection(db, "memoranda_of_agreement"));
+        batch.set(docRef, { ...moa, id: docRef.id });
+      });
+      await batch.commit();
+      toast({
+        title: "Database Seeded",
+        description: "Institutional registry populated with sample records.",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Seeding Failed",
+        description: "Could not populate initial records.",
+      });
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'APPROVED': 
@@ -113,6 +144,17 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex gap-3">
+          {isAdmin && moas?.length === 0 && (
+            <Button 
+              variant="outline" 
+              className="border-amber-500 text-amber-600 hover:bg-amber-50 font-bold"
+              onClick={seedDatabase}
+              disabled={isSeeding}
+            >
+              {isSeeding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Database className="mr-2 h-4 w-4" />}
+              Seed Sample Data
+            </Button>
+          )}
           <Button variant="outline" className="border-slate-300 font-semibold shadow-sm">
             <FileSpreadsheet className="mr-2 h-4 w-4 text-slate-600" /> Export CSV
           </Button>
@@ -216,8 +258,28 @@ export default function DashboardPage() {
               <TableBody className="bg-white">
                 {filteredMoas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-48 text-center text-slate-400 font-medium">
-                      No matching records found in institutional database. Use "Create Record" to add your first MOA.
+                    <TableCell colSpan={7} className="h-64 text-center">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="bg-slate-100 p-4 rounded-full">
+                          <Database className="h-8 w-8 text-slate-400" />
+                        </div>
+                        <div>
+                          <p className="text-slate-900 font-bold text-lg">No MOA records found.</p>
+                          <p className="text-slate-500 text-sm max-w-md mx-auto">
+                            The institutional database is currently empty. Use the <b>Create Record</b> button to add a new agreement or <b>Seed Sample Data</b> to populate the system for testing.
+                          </p>
+                        </div>
+                        {isAdmin && (
+                          <Button 
+                            variant="link" 
+                            className="text-amber-600 font-bold" 
+                            onClick={seedDatabase}
+                            disabled={isSeeding}
+                          >
+                            Populate with sample data
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
