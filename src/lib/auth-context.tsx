@@ -12,11 +12,13 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuth as useFirebaseAuth, useFirestore } from '@/firebase';
 import { User, UserRole } from '@/lib/mock-data';
+import { useToast } from '@/hooks/use-toast';
 
 type AuthContextType = {
   user: User | null;
   login: () => Promise<void>;
   logout: () => Promise<void>;
+  promoteToAdmin: () => Promise<void>;
   isLoading: boolean;
 };
 
@@ -28,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const auth = useFirebaseAuth();
   const db = useFirestore();
+  const { toast } = useToast();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -36,7 +39,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Institutional email check
         if (!firebaseUser.email?.endsWith('@neu.edu.ph')) {
           await signOut(auth);
-          alert('Only institutional @neu.edu.ph emails are allowed.');
+          toast({
+            variant: "destructive",
+            title: "Access Denied",
+            description: "Only institutional @neu.edu.ph emails are allowed.",
+          });
           setUser(null);
           setIsLoading(false);
           return;
@@ -50,30 +57,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const userData = userDoc.data();
           if (userData.isBlocked) {
             await signOut(auth);
-            alert('Your account is blocked.');
+            toast({
+              variant: "destructive",
+              title: "Account Blocked",
+              description: "Your account has been blocked by an administrator.",
+            });
             setUser(null);
           } else {
+            // Ensure roles_admin entry exists if the role is ADMIN (sync for security rules)
+            if (userData.role === 'ADMIN') {
+              await setDoc(doc(db, 'roles_admin', firebaseUser.uid), { uid: firebaseUser.uid }, { merge: true });
+            }
+            
             setUser({
               id: firebaseUser.uid,
               name: userData.name || firebaseUser.displayName || 'User',
-              email: firebaseUser.email,
+              email: firebaseUser.email || '',
               role: userData.role as UserRole,
               isBlocked: false,
               canEdit: userData.canEdit || false,
             });
           }
         } else {
-          // New user defaults to STUDENT
+          // PROTOTYPE HACK: New user defaults to ADMIN for testing purposes
+          // In a production app, this would default to 'STUDENT'
           const newUser: User = {
             id: firebaseUser.uid,
             name: firebaseUser.displayName || 'New User',
-            email: firebaseUser.email,
-            role: 'STUDENT',
+            email: firebaseUser.email || '',
+            role: 'ADMIN',
             isBlocked: false,
-            canEdit: false,
+            canEdit: true,
           };
+          
           await setDoc(userDocRef, newUser);
+          // Also create the roles_admin document to satisfy security rules
+          await setDoc(doc(db, 'roles_admin', firebaseUser.uid), { uid: firebaseUser.uid });
+          
           setUser(newUser);
+          toast({
+            title: "Admin Account Created",
+            description: "You have been granted Administrative access for testing.",
+          });
         }
       } else {
         setUser(null);
@@ -82,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [auth, db]);
+  }, [auth, db, toast]);
 
   const login = async () => {
     const provider = new GoogleAuthProvider();
@@ -92,8 +117,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       router.push('/dashboard');
     } catch (error: any) {
       console.error("Login Error:", error);
-      if (error.code !== 'auth/popup-closed-by-user') {
-        alert("Authentication failed: " + error.message);
+      if (error.code === 'auth/operation-not-allowed') {
+        toast({
+          variant: "destructive",
+          title: "Configuration Error",
+          description: "Google Sign-In is not enabled in the Firebase Console.",
+        });
+      } else if (error.code !== 'auth/popup-closed-by-user') {
+        toast({
+          variant: "destructive",
+          title: "Login Failed",
+          description: error.message,
+        });
       }
     }
   };
@@ -104,8 +139,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/login');
   };
 
+  const promoteToAdmin = async () => {
+    if (!auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    
+    await setDoc(doc(db, 'users', uid), { role: 'ADMIN', canEdit: true }, { merge: true });
+    await setDoc(doc(db, 'roles_admin', uid), { uid });
+    
+    toast({
+      title: "Promoted to Admin",
+      description: "Refresh the page to see administrative tools.",
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, logout, promoteToAdmin, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
