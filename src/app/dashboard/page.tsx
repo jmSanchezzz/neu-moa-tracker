@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { MoaStats } from "@/components/moa/moa-stats";
-import { MOCK_MOAS, MOA } from "@/lib/mock-data";
+import { MOCK_MOAS } from "@/lib/mock-data";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,8 @@ import {
   Edit, 
   Trash2, 
   MoreHorizontal,
-  FileSpreadsheet
+  FileSpreadsheet,
+  AlertCircle
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -45,6 +46,7 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [collegeFilter, setCollegeFilter] = useState("all");
   const [industryFilter, setIndustryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   if (!user) return null;
 
@@ -67,52 +69,64 @@ export default function DashboardPage() {
 
       const matchesCollege = collegeFilter === "all" || moa.college === collegeFilter;
       const matchesIndustry = industryFilter === "all" || moa.industryType === industryFilter;
+      const matchesStatus = statusFilter === "all" || moa.status === statusFilter;
 
-      return matchesSearch && matchesCollege && matchesIndustry;
+      return matchesSearch && matchesCollege && matchesIndustry && matchesStatus;
     });
-  }, [searchQuery, collegeFilter, industryFilter, isStudent, isFaculty]);
+  }, [searchQuery, collegeFilter, industryFilter, statusFilter, isStudent, isFaculty]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'APPROVED': return <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">Approved</Badge>;
-      case 'PROCESSING': return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200">Processing</Badge>;
-      case 'EXPIRING': return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200">Expiring</Badge>;
-      case 'EXPIRED': return <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-red-200">Expired</Badge>;
-      default: return <Badge variant="outline">{status}</Badge>;
+      case 'APPROVED': 
+        return <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200 px-3 py-1 font-semibold rounded-full">Approved</Badge>;
+      case 'PROCESSING': 
+        return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200 px-3 py-1 font-semibold rounded-full">Processing</Badge>;
+      case 'EXPIRING': 
+        return (
+          <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200 px-3 py-1 font-semibold rounded-full flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" /> Expiring
+          </Badge>
+        );
+      case 'EXPIRED': 
+        return <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-red-200 px-3 py-1 font-semibold rounded-full">Expired</Badge>;
+      default: 
+        return <Badge variant="outline" className="px-3 py-1 rounded-full">{status}</Badge>;
     }
   };
 
   return (
-    <div className="space-y-6 max-w-[1600px] mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-primary">Admin Command Center</h2>
-          <p className="text-muted-foreground">
-            Centralized monitoring and management for institutional agreements.
+          <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Admin Command Center</h2>
+          <p className="text-slate-500 mt-1 font-medium">
+            Real-time institutional agreement monitoring and analytics.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline">
-            <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Data
+        <div className="flex gap-3">
+          <Button variant="outline" className="border-slate-300 font-semibold shadow-sm">
+            <FileSpreadsheet className="mr-2 h-4 w-4 text-slate-600" /> Export CSV
           </Button>
           {(isAdmin || (isFaculty && user.canEdit)) && (
-            <Button className="bg-primary shadow-lg shadow-primary/20">
-              <PlusCircle className="mr-2 h-4 w-4" /> Create New Record
+            <Button className="bg-slate-900 text-white shadow-lg hover:bg-slate-800 transition-all font-semibold">
+              <PlusCircle className="mr-2 h-4 w-4 text-amber-500" /> Create Record
             </Button>
           )}
         </div>
       </div>
 
+      {/* Row 1: Stat Cards */}
       <MoaStats moas={filteredMoas} />
 
-      {/* Control Bar */}
-      <Card className="border-none shadow-sm bg-card/50 backdrop-blur-sm">
+      {/* Row 2: Control Toolbar */}
+      <Card className="border-none shadow-sm bg-slate-50 ring-1 ring-slate-200">
         <CardContent className="p-4 flex flex-col lg:flex-row items-center gap-4">
           <div className="relative flex-1 w-full lg:w-auto">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input 
               placeholder="Search Company, HTE, or ID..." 
-              className="pl-10 bg-background border-none ring-1 ring-border focus-visible:ring-primary"
+              className="pl-10 bg-white border-slate-200 focus-visible:ring-amber-500"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -120,9 +134,9 @@ export default function DashboardPage() {
           
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Filter className="h-4 w-4 text-slate-400" />
               <Select value={collegeFilter} onValueChange={setCollegeFilter}>
-                <SelectTrigger className="w-[180px] bg-background">
+                <SelectTrigger className="w-[160px] bg-white border-slate-200 font-medium">
                   <SelectValue placeholder="College" />
                 </SelectTrigger>
                 <SelectContent>
@@ -133,7 +147,7 @@ export default function DashboardPage() {
             </div>
 
             <Select value={industryFilter} onValueChange={setIndustryFilter}>
-              <SelectTrigger className="w-[180px] bg-background">
+              <SelectTrigger className="w-[160px] bg-white border-slate-200 font-medium">
                 <SelectValue placeholder="Industry" />
               </SelectTrigger>
               <SelectContent>
@@ -142,100 +156,112 @@ export default function DashboardPage() {
               </SelectContent>
             </Select>
 
-            <Button variant="outline" className="gap-2 bg-background">
-              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-              <span>Select Date Range</span>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[140px] bg-white border-slate-200 font-medium">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="APPROVED">Approved</SelectItem>
+                <SelectItem value="PROCESSING">Processing</SelectItem>
+                <SelectItem value="EXPIRING">Expiring</SelectItem>
+                <SelectItem value="EXPIRED">Expired</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button variant="outline" className="gap-2 bg-white border-slate-200 font-medium">
+              <CalendarIcon className="h-4 w-4 text-slate-400" />
+              <span>Date Range</span>
             </Button>
 
-            {(searchQuery || collegeFilter !== "all" || industryFilter !== "all") && (
-              <Button variant="ghost" size="sm" onClick={() => {
+            {(searchQuery || collegeFilter !== "all" || industryFilter !== "all" || statusFilter !== "all") && (
+              <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-900" onClick={() => {
                 setSearchQuery("");
                 setCollegeFilter("all");
                 setIndustryFilter("all");
+                setStatusFilter("all");
               }}>Reset</Button>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Master Data Table */}
-      <Card className="border-none shadow-xl overflow-hidden">
-        <CardHeader className="bg-muted/30 px-6 py-4 flex flex-row items-center justify-between">
-          <CardTitle className="text-lg font-bold flex items-center gap-2">
-            Master MOA Records
-            <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary border-none">
-              {filteredMoas.length} Total
-            </Badge>
-          </CardTitle>
-          <div className="flex gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-muted/50">
+      {/* Row 3: Master Data Table */}
+      <Card className="border border-slate-200 shadow-xl rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-slate-900 text-white hover:bg-slate-900">
+              <TableRow className="hover:bg-transparent border-slate-800">
+                <TableHead className="w-[320px] text-slate-200 font-bold py-5">Company Entity</TableHead>
+                <TableHead className="text-slate-200 font-bold">Industry Segment</TableHead>
+                <TableHead className="text-slate-200 font-bold">Primary Contact</TableHead>
+                <TableHead className="text-slate-200 font-bold">Effective Date</TableHead>
+                <TableHead className="text-slate-200 font-bold">College</TableHead>
+                <TableHead className="text-slate-200 font-bold">Status</TableHead>
+                <TableHead className="text-right text-slate-200 font-bold pr-6">Operations</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="bg-white">
+              {filteredMoas.length === 0 ? (
                 <TableRow>
-                  <TableHead className="w-[280px]">Company Name</TableHead>
-                  <TableHead>Industry</TableHead>
-                  <TableHead>Contact Person</TableHead>
-                  <TableHead>Effective Date</TableHead>
-                  <TableHead>Endorsed By</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableCell colSpan={7} className="h-48 text-center text-slate-400 font-medium">
+                    No matching records found in institutional database.
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredMoas.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                      No matching records found in the database.
+              ) : (
+                filteredMoas.map((moa) => (
+                  <TableRow key={moa.id} className="hover:bg-slate-50 transition-colors border-slate-100 group">
+                    <TableCell className="py-4">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-bold text-slate-900 text-base leading-none">{moa.companyName}</span>
+                        <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">{moa.hteId}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="font-bold border-slate-200 text-slate-600 bg-slate-100/50">
+                        {moa.industryType}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-slate-800">{moa.contactPerson}</span>
+                        <span className="text-xs text-slate-500 font-medium">{moa.contactPersonEmail}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-slate-600 font-bold">
+                      {moa.effectiveDate}
+                    </TableCell>
+                    <TableCell className="text-sm text-slate-500 font-medium">
+                      {moa.college}
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(moa.status)}
+                    </TableCell>
+                    <TableCell className="text-right pr-6">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  filteredMoas.map((moa) => (
-                    <TableRow key={moa.id} className="hover:bg-muted/30 transition-colors group">
-                      <TableCell className="font-bold text-primary">
-                        <div className="flex flex-col">
-                          <span>{moa.companyName}</span>
-                          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-tighter">{moa.hteId}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-medium bg-muted/20">{moa.industryType}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium">{moa.contactPerson}</span>
-                          <span className="text-xs text-muted-foreground">{moa.contactPersonEmail}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground font-medium">
-                        {moa.effectiveDate}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {moa.college}
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(moa.status)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex items-center justify-between">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            Displaying {filteredMoas.length} of {MOCK_MOAS.length} Total Institutional Records
+          </p>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled className="text-xs font-bold border-slate-300">Previous</Button>
+            <Button variant="outline" size="sm" disabled className="text-xs font-bold border-slate-300">Next</Button>
           </div>
-        </CardContent>
+        </div>
       </Card>
     </div>
   );

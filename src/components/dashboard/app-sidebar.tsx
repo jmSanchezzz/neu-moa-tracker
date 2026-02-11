@@ -7,7 +7,9 @@ import {
   History, 
   LogOut,
   Trash2,
-  ShieldAlert
+  ShieldAlert,
+  Settings,
+  Archive
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -33,42 +35,45 @@ export function AppSidebar() {
   const isAdmin = user.role === 'ADMIN';
 
   return (
-    <Sidebar variant="inset" collapsible="icon">
-      <SidebarHeader className="h-16 flex items-center px-4">
+    <Sidebar variant="sidebar" collapsible="icon" className="bg-slate-900 text-slate-200 border-r-0">
+      <SidebarHeader className="h-16 flex items-center px-6 border-b border-slate-800">
         <div className="flex items-center gap-3">
-          <div className="bg-primary/20 rounded-lg p-2">
-            <ShieldAlert className="w-5 h-5 text-primary-foreground" />
+          <div className="bg-amber-500 rounded p-1.5">
+            <ShieldAlert className="w-5 h-5 text-slate-900" />
           </div>
-          <span className="font-bold text-lg group-data-[collapsible=icon]:hidden text-sidebar-foreground">NEU MOA</span>
+          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+            <span className="font-black text-lg tracking-tighter text-white">NEU TRACKER</span>
+            <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest -mt-1">Academic Enterprise</span>
+          </div>
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="px-2 pt-4">
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/50">General</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-slate-500 font-black text-[10px] uppercase tracking-[0.2em] mb-2 px-4">Core Navigator</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Dashboard">
+                <SidebarMenuButton asChild tooltip="Dashboard" className="hover:bg-slate-800 hover:text-white h-10 px-4 group">
                   <a href="/dashboard">
-                    <LayoutDashboard />
-                    <span>Command Center</span>
+                    <LayoutDashboard className="group-hover:text-amber-500 transition-colors" />
+                    <span className="font-bold">Command Center</span>
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="MOAs">
+                <SidebarMenuButton asChild tooltip="MOAs" className="hover:bg-slate-800 hover:text-white h-10 px-4 group">
                   <a href="/dashboard/moas">
-                    <FileText />
-                    <span>All MOAs</span>
+                    <FileText className="group-hover:text-amber-500 transition-colors" />
+                    <span className="font-bold">Active Records</span>
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Archived">
+                <SidebarMenuButton asChild tooltip="Archived" className="hover:bg-slate-800 hover:text-white h-10 px-4 group">
                   <a href="/dashboard/moas?filter=deleted">
-                    <Trash2 />
-                    <span>Archived / Trash</span>
+                    <Archive className="group-hover:text-amber-500 transition-colors" />
+                    <span className="font-bold">Archived / Trash</span>
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -77,23 +82,31 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {isAdmin && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-sidebar-foreground/50">Administration</SidebarGroupLabel>
+          <SidebarGroup className="mt-4">
+            <SidebarGroupLabel className="text-slate-500 font-black text-[10px] uppercase tracking-[0.2em] mb-2 px-4">Administration</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Users">
+                  <SidebarMenuButton asChild tooltip="Users" className="hover:bg-slate-800 hover:text-white h-10 px-4 group">
                     <a href="/dashboard/users">
-                      <Users />
-                      <span>User Management</span>
+                      <Users className="group-hover:text-amber-500 transition-colors" />
+                      <span className="font-bold">IAM Management</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Audit Trails">
+                  <SidebarMenuButton asChild tooltip="Audit Trails" className="hover:bg-slate-800 hover:text-white h-10 px-4 group">
                     <a href="/dashboard/audit">
-                      <History />
-                      <span>Audit Logs</span>
+                      <History className="group-hover:text-amber-500 transition-colors" />
+                      <span className="font-bold">System Audit Logs</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Settings" className="hover:bg-slate-800 hover:text-white h-10 px-4 group">
+                    <a href="/dashboard/settings">
+                      <Settings className="group-hover:text-amber-500 transition-colors" />
+                      <span className="font-bold">Control Panel</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -103,27 +116,27 @@ export function AppSidebar() {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="p-4 border-t border-sidebar-border">
-        <div className="flex items-center gap-3 mb-4 group-data-[collapsible=icon]:hidden">
-          <Avatar className="h-9 w-9 border-2 border-primary/40">
-            <AvatarFallback className="bg-primary text-white text-xs">
+      <SidebarFooter className="p-4 border-t border-slate-800 mt-auto bg-slate-900/50">
+        <div className="flex items-center gap-3 mb-4 group-data-[collapsible=icon]:hidden px-2">
+          <Avatar className="h-10 w-10 border-2 border-amber-500/20">
+            <AvatarFallback className="bg-amber-500 text-slate-900 font-black">
               {user.name.charAt(0)}
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col overflow-hidden">
-            <span className="text-sm font-semibold truncate text-sidebar-foreground">{user.name}</span>
-            <span className="text-xs opacity-60 truncate text-sidebar-foreground">{user.role}</span>
+            <span className="text-sm font-bold truncate text-white">{user.name}</span>
+            <span className="text-[10px] font-black uppercase text-amber-500 tracking-wider truncate">{user.role} ACCESS</span>
           </div>
         </div>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton 
               onClick={logout} 
-              className="text-white hover:bg-destructive transition-colors duration-200"
+              className="h-10 px-4 rounded-lg bg-slate-800/50 hover:bg-red-500 hover:text-white transition-all duration-300 group"
               tooltip="Logout"
             >
-              <LogOut className="text-destructive" />
-              <span>Sign Out</span>
+              <LogOut className="text-slate-400 group-hover:text-white" />
+              <span className="font-bold">System Exit</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
