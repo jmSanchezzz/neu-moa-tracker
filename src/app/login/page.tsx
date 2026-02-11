@@ -5,53 +5,81 @@ import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { ShieldCheck, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ShieldCheck, Loader2, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
-  const { login, isLoading } = useAuth();
+  const { loginWithEmail, isLoading } = useAuth();
+  const [email, setEmail] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  const handleGoogleSignIn = async () => {
+  const handleManualSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !email.endsWith('@neu.edu.ph')) return;
+    
     setIsLoggingIn(true);
     try {
-      await login();
+      await loginWithEmail(email);
     } finally {
       setIsLoggingIn(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md shadow-xl border-t-4 border-t-accent">
-        <CardHeader className="text-center">
-          <div className="mx-auto bg-accent/10 w-16 h-16 rounded-full flex items-center justify-center mb-4">
-            <ShieldCheck className="w-10 h-10 text-accent" />
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 font-body">
+      <Card className="w-full max-w-md shadow-2xl border-t-4 border-t-accent bg-white">
+        <CardHeader className="text-center pb-2">
+          <div className="mx-auto bg-primary/10 w-20 h-20 rounded-2xl flex items-center justify-center mb-4 transform rotate-3 shadow-inner">
+            <ShieldCheck className="w-12 h-12 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold font-headline text-primary uppercase tracking-tight">NEU MOA Tracker</CardTitle>
-          <CardDescription className="font-semibold text-muted-foreground"> Institutional Access Gateway </CardDescription>
+          <CardTitle className="text-3xl font-black font-headline text-sidebar uppercase tracking-tighter">
+            NEU <span className="text-primary">MOA</span> TRACKER
+          </CardTitle>
+          <CardDescription className="font-bold text-muted-foreground uppercase tracking-widest text-[10px] mt-1"> 
+            Institutional Access Gateway 
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="p-4 bg-secondary/50 rounded-lg text-sm text-center border border-border">
-            Please sign in with your <b className="text-primary">@neu.edu.ph</b> account to access the administrative command center.
+        <CardContent className="space-y-6 pt-6">
+          <div className="p-4 bg-slate-50 rounded-xl text-xs text-center border border-slate-100 font-medium text-slate-600 leading-relaxed">
+            Authorized Personnel: Please enter your <b className="text-primary">@neu.edu.ph</b> email to access the administrative command center.
           </div>
-          <Button 
-            onClick={handleGoogleSignIn} 
-            className="w-full bg-primary hover:bg-primary/90 h-12 text-base font-bold shadow-md transition-all active:scale-95"
-            disabled={isLoggingIn || isLoading}
-          >
-            {isLoggingIn ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Validating Credentials...
-              </>
-            ) : (
-              "Sign In with Google"
-            )}
-          </Button>
+          
+          <form onSubmit={handleManualSignIn} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Institutional Email</Label>
+              <Input 
+                id="email"
+                type="email"
+                placeholder="identity@neu.edu.ph"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-12 border-slate-200 focus-visible:ring-primary font-semibold"
+                required
+              />
+            </div>
+            
+            <Button 
+              type="submit"
+              className="w-full bg-primary hover:bg-primary/90 h-14 text-base font-black shadow-lg shadow-primary/20 transition-all active:scale-[0.98] group"
+              disabled={isLoggingIn || isLoading || !email.endsWith('@neu.edu.ph')}
+            >
+              {isLoggingIn ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  AUTHENTICATING...
+                </>
+              ) : (
+                <span className="flex items-center gap-2">
+                  ENTER COMMAND CENTER <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </span>
+              )}
+            </Button>
+          </form>
         </CardContent>
-        <CardFooter className="flex flex-col text-center text-[10px] text-muted-foreground uppercase tracking-widest font-bold opacity-60">
+        <CardFooter className="flex flex-col text-center text-[9px] text-muted-foreground uppercase tracking-[0.2em] font-black pb-8 opacity-40">
           <p>Official Academic Enterprise System</p>
-          <p className="mt-1">Authorized Personnel Only</p>
+          <p className="mt-1">Restricted Access • Monitoring Enabled</p>
         </CardFooter>
       </Card>
     </div>
