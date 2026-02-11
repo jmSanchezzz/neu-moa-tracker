@@ -30,10 +30,11 @@ import {
   Trash2, 
   FileSpreadsheet,
   AlertCircle,
-  Loader2
+  Loader2,
+  PlusCircle
 } from "lucide-react";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, where, orderBy } from "firebase/firestore";
+import { collection, query, orderBy } from "firebase/firestore";
 import { AddMoaDialog } from "@/components/moa/add-moa-dialog";
 
 export default function DashboardPage() {
@@ -116,7 +117,11 @@ export default function DashboardPage() {
             <FileSpreadsheet className="mr-2 h-4 w-4 text-slate-600" /> Export CSV
           </Button>
           {(isAdmin || (isFaculty && user.canEdit)) && (
-            <AddMoaDialog />
+            <AddMoaDialog>
+              <Button className="bg-slate-900 text-white shadow-lg hover:bg-slate-800 transition-all font-semibold">
+                <PlusCircle className="mr-2 h-4 w-4 text-amber-500" /> Create Record
+              </Button>
+            </AddMoaDialog>
           )}
         </div>
       </div>
@@ -212,7 +217,7 @@ export default function DashboardPage() {
                 {filteredMoas.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-48 text-center text-slate-400 font-medium">
-                      No matching records found in institutional database.
+                      No matching records found in institutional database. Use "Create Record" to add your first MOA.
                     </TableCell>
                   </TableRow>
                 ) : (
