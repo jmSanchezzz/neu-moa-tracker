@@ -1,0 +1,228 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user within the NEU MOA Tracker system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "googleId": {
+          "type": "string",
+          "description": "The Google ID of the user, used for authentication."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address.",
+          "format": "email"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The user's first name."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The user's last name."
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the user (Admin, Faculty, Student)."
+        },
+        "isBlocked": {
+          "type": "boolean",
+          "description": "Indicates if the user is blocked from accessing the system."
+        }
+      },
+      "required": [
+        "id",
+        "googleId",
+        "email",
+        "firstName",
+        "lastName",
+        "role",
+        "isBlocked"
+      ]
+    },
+    "MemorandumOfAgreement": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "MemorandumOfAgreement",
+      "type": "object",
+      "description": "Represents a Memorandum of Agreement (MOA) record.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the MemorandumOfAgreement entity."
+        },
+        "hteId": {
+          "type": "string",
+          "description": "HTE ID of the MOA."
+        },
+        "companyName": {
+          "type": "string",
+          "description": "Name of the company involved in the MOA."
+        },
+        "companyAddress": {
+          "type": "string",
+          "description": "Address of the company."
+        },
+        "contactPerson": {
+          "type": "string",
+          "description": "Contact person at the company."
+        },
+        "contactPersonEmail": {
+          "type": "string",
+          "description": "Email address of the contact person.",
+          "format": "email"
+        },
+        "typeOfIndustry": {
+          "type": "string",
+          "description": "Type of industry the company belongs to."
+        },
+        "effectiveDate": {
+          "type": "string",
+          "description": "Effective date of the MOA.",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the MOA (APPROVED, PROCESSING, EXPIRED, EXPIRING)."
+        },
+        "endorsedByCollege": {
+          "type": "string",
+          "description": "College that endorsed the MOA."
+        },
+        "isDeleted": {
+          "type": "boolean",
+          "description": "Indicates if the MOA has been soft deleted."
+        }
+      },
+      "required": [
+        "id",
+        "hteId",
+        "companyName",
+        "companyAddress",
+        "contactPerson",
+        "contactPersonEmail",
+        "typeOfIndustry",
+        "effectiveDate",
+        "status",
+        "endorsedByCollege",
+        "isDeleted"
+      ]
+    },
+    "AuditLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AuditLog",
+      "type": "object",
+      "description": "Represents an audit log entry for user actions.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the AuditLog entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N AuditLog)"
+        },
+        "moaId": {
+          "type": "string",
+          "description": "Reference to MemorandumOfAgreement. (Relationship: MemorandumOfAgreement 1:N AuditLog)"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of when the action was performed.",
+          "format": "date-time"
+        },
+        "operation": {
+          "type": "string",
+          "description": "The operation performed (insert, edit, delete)."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "moaId",
+        "timestamp",
+        "operation"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. Authorization is based on the authenticated user's ID. The `role` field determines access to other parts of the database.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "roles_admin",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Documents exist only if the user is an admin. Used in rules with `exists()` to grant admin privileges.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the admin user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/memoranda_of_agreement/{moaId}",
+        "definition": {
+          "entityName": "MemorandumOfAgreement",
+          "schema": {
+            "$ref": "#/backend/entities/MemorandumOfAgreement"
+          },
+          "description": "Stores MOA records. Includes denormalized 'endorsedByCollege' field for authorization independence.",
+          "params": [
+            {
+              "name": "moaId",
+              "description": "The unique identifier of the Memorandum of Agreement."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/audit_logs/{auditLogId}",
+        "definition": {
+          "entityName": "AuditLog",
+          "schema": {
+            "$ref": "#/backend/entities/AuditLog"
+          },
+          "description": "Stores audit logs related to MOA activities. This collection is separate to limit access to only admin users.",
+          "params": [
+            {
+              "name": "auditLogId",
+              "description": "The unique identifier of the audit log entry."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support role-based access control and efficient MOA management within the NEU MOA Tracker application. It emphasizes authorization independence, clarity, and scalability.\n\n*   `/users/{userId}`: Stores user profiles.  Authorization is based on the authenticated user's ID. The `role` field determines access to other parts of the database. No other data is stored here. Access control is simplified to `request.auth.uid == userId`.\n*   `/roles_admin/{userId}`: Documents exist only if the user is an admin. Used in rules with `exists()` to grant admin privileges.\n*   `/memoranda_of_agreement/{moaId}`: Stores MOA records. To ensure Authorization Independence, the `endorsedByCollege` field is denormalized into each MOA document. This allows faculty to filter MOAs by college without requiring complex `get()` calls in security rules.\n*   `/audit_logs/{auditLogId}`: Stores audit logs.  This collection is separate to limit access to only admin users.\n\n**Authorization Independence:**\nThe design ensures authorization independence by denormalizing the `endorsedByCollege` field within each MOA document. This eliminates the need for security rules to perform `get()` operations on parent documents to determine access, thereby enabling atomic operations and simplifying security rules.\n\n**QAPs (Rules are not Filters):**\n\n*   The segregation of MOAs into a single collection (`/memoranda_of_agreement`) and the denormalization of `endorsedByCollege` ensure that `list` operations are secure. Rules can filter MOAs based on the denormalized `endorsedByCollege` field, without allowing unauthorized access to other MOAs.\n*   Admin role is checked via existence in `/roles_admin/{userId}`. This ensures scalable role management.\n*   Student role is implicitly granted if they are authenticated and not blocked, so approved MOAs are automatically visible without any further checks."
+  }
+}
