@@ -20,20 +20,48 @@ import {
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Edit, Trash, RotateCcw, Eye } from "lucide-react";
+import { EditMoaDialog } from "./edit-moa-dialog";
+import { ViewMoaDialog } from "./view-moa-dialog";
+import { useFirestore } from "@/firebase";
+import { doc } from "firebase/firestore";
+import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { useToast } from "@/hooks/use-toast";
 
 type MoaTableProps = {
   data: MOA[];
   role: UserRole;
-  onEdit?: (moa: MOA) => void;
-  onDelete?: (id: string) => void;
-  onRecover?: (id: string) => void;
   canEdit?: boolean;
 };
 
-export function MoaTable({ data, role, onEdit, onDelete, onRecover, canEdit }: MoaTableProps) {
+export function MoaTable({ data, role, canEdit }: MoaTableProps) {
+  const { toast } = useToast();
+  const db = useFirestore();
+  const [editingMoa, setEditingMoa] = useState<MOA | null>(null);
+  const [viewingMoa, setViewingMoa] = useState<MOA | null>(null);
+
   const isAdmin = role === 'ADMIN';
   const isFaculty = role === 'FACULTY';
   const isStudent = role === 'STUDENT';
+
+  const handleSoftDelete = (moa: MOA) => {
+    if (!db) return;
+    const docRef = doc(db, "memoranda_of_agreement", moa.id);
+    updateDocumentNonBlocking(docRef, { isDeleted: true });
+    toast({
+      title: "Record Archived",
+      description: `${moa.companyName} has been moved to trash.`,
+    });
+  };
+
+  const handleRecover = (moa: MOA) => {
+    if (!db) return;
+    const docRef = doc(db, "memoranda_of_agreement", moa.id);
+    updateDocumentNonBlocking(docRef, { isDeleted: false });
+    toast({
+      title: "Record Restored",
+      description: `${moa.companyName} is now active again.`,
+    });
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -110,19 +138,19 @@ export function MoaTable({ data, role, onEdit, onDelete, onRecover, canEdit }: M
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setViewingMoa(moa)}>
                             <Eye className="mr-2 h-4 w-4" /> View Details
                           </DropdownMenuItem>
                           
                           {((isAdmin) || (isFaculty && canEdit)) && !moa.isDeleted && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => onEdit?.(moa)}>
+                              <DropdownMenuItem onClick={() => setEditingMoa(moa)}>
                                 <Edit className="mr-2 h-4 w-4" /> Edit
                               </DropdownMenuItem>
                               <DropdownMenuItem 
                                 className="text-destructive" 
-                                onClick={() => onDelete?.(moa.id)}
+                                onClick={() => handleSoftDelete(moa)}
                               >
                                 <Trash className="mr-2 h-4 w-4" /> Soft Delete
                               </DropdownMenuItem>
@@ -132,7 +160,7 @@ export function MoaTable({ data, role, onEdit, onDelete, onRecover, canEdit }: M
                           {isAdmin && moa.isDeleted && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => onRecover?.(moa.id)}>
+                              <DropdownMenuItem onClick={() => handleRecover(moa)}>
                                 <RotateCcw className="mr-2 h-4 w-4" /> Recover
                               </DropdownMenuItem>
                             </>
@@ -147,6 +175,18 @@ export function MoaTable({ data, role, onEdit, onDelete, onRecover, canEdit }: M
           )}
         </TableBody>
       </Table>
+
+      <EditMoaDialog 
+        moa={editingMoa} 
+        open={!!editingMoa} 
+        onOpenChange={(open) => !open && setEditingMoa(null)} 
+      />
+      
+      <ViewMoaDialog 
+        moa={viewingMoa} 
+        open={!!viewingMoa} 
+        onOpenChange={(open) => !open && setViewingMoa(null)} 
+      />
     </div>
   );
 }
