@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { MOCK_MOAS, MOA } from "@/lib/mock-data";
 import { MoaTable } from "@/components/moa/moa-table";
 import { SearchSection } from "@/components/moa/search-section";
 import {
@@ -14,13 +13,24 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Loader2 } from "lucide-react";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, query, orderBy } from "firebase/firestore";
+import { AddMoaDialog } from "@/components/moa/add-moa-dialog";
 
 export default function MoasPage() {
   const { user } = useAuth();
+  const db = useFirestore();
   const [searchQuery, setSearchQuery] = useState("");
   const [collegeFilter, setCollegeFilter] = useState("all");
   const [industryFilter, setIndustryFilter] = useState("all");
+
+  const moaQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return query(collection(db, "memoranda_of_agreement"), orderBy("effectiveDate", "desc"));
+  }, [db]);
+
+  const { data: moas, isLoading } = useCollection(moaQuery);
 
   if (!user) return null;
 
@@ -28,11 +38,12 @@ export default function MoasPage() {
   const isFaculty = user.role === 'FACULTY';
   const isStudent = user.role === 'STUDENT';
 
-  const colleges = Array.from(new Set(MOCK_MOAS.map(m => m.college)));
-  const industries = Array.from(new Set(MOCK_MOAS.map(m => m.industryType)));
+  const colleges = Array.from(new Set(moas?.map(m => m.college) || []));
+  const industries = Array.from(new Set(moas?.map(m => m.industryType) || []));
 
   const filteredData = useMemo(() => {
-    return MOCK_MOAS.filter(moa => {
+    if (!moas) return [];
+    return moas.filter(moa => {
       // Role visibility rules
       if (isStudent && moa.status !== 'APPROVED') return false;
       if ((isStudent || isFaculty) && moa.isDeleted) return false;
@@ -51,7 +62,7 @@ export default function MoasPage() {
 
       return matchesSearch && matchesCollege && matchesIndustry;
     });
-  }, [searchQuery, collegeFilter, industryFilter, isStudent, isFaculty]);
+  }, [moas, searchQuery, collegeFilter, industryFilter, isStudent, isFaculty]);
 
   return (
     <div className="space-y-6">
@@ -63,10 +74,12 @@ export default function MoasPage() {
           </p>
         </div>
         {((isAdmin) || (isFaculty && user.canEdit)) && (
-          <Button className="bg-primary">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add New MOA
-          </Button>
+          <AddMoaDialog>
+            <Button className="bg-primary">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add New MOA
+            </Button>
+          </AddMoaDialog>
         )}
       </div>
 
@@ -116,11 +129,17 @@ export default function MoasPage() {
         </div>
       </div>
 
-      <MoaTable 
-        data={filteredData} 
-        role={user.role} 
-        canEdit={user.canEdit}
-      />
+      {isLoading ? (
+        <div className="flex items-center justify-center h-48">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
+        </div>
+      ) : (
+        <MoaTable 
+          data={filteredData as any} 
+          role={user.role} 
+          canEdit={user.canEdit}
+        />
+      )}
     </div>
   );
 }

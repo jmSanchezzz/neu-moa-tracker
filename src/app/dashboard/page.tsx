@@ -3,8 +3,7 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { MoaStats } from "@/components/moa/moa-stats";
-import { MOCK_MOAS } from "@/lib/mock-data";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -27,26 +26,34 @@ import {
   Search, 
   Filter, 
   Calendar as CalendarIcon, 
-  PlusCircle, 
   Edit, 
   Trash2, 
-  MoreHorizontal,
   FileSpreadsheet,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from "lucide-react";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, query, where, orderBy } from "firebase/firestore";
+import { AddMoaDialog } from "@/components/moa/add-moa-dialog";
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const db = useFirestore();
   const [searchQuery, setSearchQuery] = useState("");
   const [collegeFilter, setCollegeFilter] = useState("all");
   const [industryFilter, setIndustryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  // Real-time Firestore Collection
+  const moaQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return query(
+      collection(db, "memoranda_of_agreement"),
+      orderBy("effectiveDate", "desc")
+    );
+  }, [db]);
+
+  const { data: moas, isLoading } = useCollection(moaQuery);
 
   if (!user) return null;
 
@@ -54,11 +61,12 @@ export default function DashboardPage() {
   const isFaculty = user.role === 'FACULTY';
   const isStudent = user.role === 'STUDENT';
 
-  const colleges = Array.from(new Set(MOCK_MOAS.map(m => m.college)));
-  const industries = Array.from(new Set(MOCK_MOAS.map(m => m.industryType)));
+  const colleges = Array.from(new Set(moas?.map(m => m.college) || []));
+  const industries = Array.from(new Set(moas?.map(m => m.industryType) || []));
 
   const filteredMoas = useMemo(() => {
-    return MOCK_MOAS.filter(moa => {
+    if (!moas) return [];
+    return moas.filter(moa => {
       if (isStudent && moa.status !== 'APPROVED') return false;
       if ((isStudent || isFaculty) && moa.isDeleted) return false;
 
@@ -73,7 +81,7 @@ export default function DashboardPage() {
 
       return matchesSearch && matchesCollege && matchesIndustry && matchesStatus;
     });
-  }, [searchQuery, collegeFilter, industryFilter, statusFilter, isStudent, isFaculty]);
+  }, [moas, searchQuery, collegeFilter, industryFilter, statusFilter, isStudent, isFaculty]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -96,7 +104,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-6">
         <div>
           <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Admin Command Center</h2>
@@ -109,17 +116,13 @@ export default function DashboardPage() {
             <FileSpreadsheet className="mr-2 h-4 w-4 text-slate-600" /> Export CSV
           </Button>
           {(isAdmin || (isFaculty && user.canEdit)) && (
-            <Button className="bg-slate-900 text-white shadow-lg hover:bg-slate-800 transition-all font-semibold">
-              <PlusCircle className="mr-2 h-4 w-4 text-amber-500" /> Create Record
-            </Button>
+            <AddMoaDialog />
           )}
         </div>
       </div>
 
-      {/* Row 1: Stat Cards */}
-      <MoaStats moas={filteredMoas} />
+      <MoaStats moas={filteredMoas as any} />
 
-      {/* Row 2: Control Toolbar */}
       <Card className="border-none shadow-sm bg-slate-50 ring-1 ring-slate-200">
         <CardContent className="p-4 flex flex-col lg:flex-row items-center gap-4">
           <div className="relative flex-1 w-full lg:w-auto">
@@ -186,76 +189,81 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Row 3: Master Data Table */}
       <Card className="border border-slate-200 shadow-xl rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-slate-900 text-white hover:bg-slate-900">
-              <TableRow className="hover:bg-transparent border-slate-800">
-                <TableHead className="w-[320px] text-slate-200 font-bold py-5">Company Entity</TableHead>
-                <TableHead className="text-slate-200 font-bold">Industry Segment</TableHead>
-                <TableHead className="text-slate-200 font-bold">Primary Contact</TableHead>
-                <TableHead className="text-slate-200 font-bold">Effective Date</TableHead>
-                <TableHead className="text-slate-200 font-bold">College</TableHead>
-                <TableHead className="text-slate-200 font-bold">Status</TableHead>
-                <TableHead className="text-right text-slate-200 font-bold pr-6">Operations</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody className="bg-white">
-              {filteredMoas.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-48 text-center text-slate-400 font-medium">
-                    No matching records found in institutional database.
-                  </TableCell>
+        <div className="overflow-x-auto min-h-[300px]">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-48">
+              <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader className="bg-slate-900 text-white hover:bg-slate-900">
+                <TableRow className="hover:bg-transparent border-slate-800">
+                  <TableHead className="w-[320px] text-slate-200 font-bold py-5">Company Entity</TableHead>
+                  <TableHead className="text-slate-200 font-bold">Industry Segment</TableHead>
+                  <TableHead className="text-slate-200 font-bold">Primary Contact</TableHead>
+                  <TableHead className="text-slate-200 font-bold">Effective Date</TableHead>
+                  <TableHead className="text-slate-200 font-bold">College</TableHead>
+                  <TableHead className="text-slate-200 font-bold">Status</TableHead>
+                  <TableHead className="text-right text-slate-200 font-bold pr-6">Operations</TableHead>
                 </TableRow>
-              ) : (
-                filteredMoas.map((moa) => (
-                  <TableRow key={moa.id} className="hover:bg-slate-50 transition-colors border-slate-100 group">
-                    <TableCell className="py-4">
-                      <div className="flex flex-col gap-1">
-                        <span className="font-bold text-slate-900 text-base leading-none">{moa.companyName}</span>
-                        <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">{moa.hteId}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="font-bold border-slate-200 text-slate-600 bg-slate-100/50">
-                        {moa.industryType}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-slate-800">{moa.contactPerson}</span>
-                        <span className="text-xs text-slate-500 font-medium">{moa.contactPersonEmail}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-600 font-bold">
-                      {moa.effectiveDate}
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-500 font-medium">
-                      {moa.college}
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(moa.status)}
-                    </TableCell>
-                    <TableCell className="text-right pr-6">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+              </TableHeader>
+              <TableBody className="bg-white">
+                {filteredMoas.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-48 text-center text-slate-400 font-medium">
+                      No matching records found in institutional database.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  filteredMoas.map((moa) => (
+                    <TableRow key={moa.id} className="hover:bg-slate-50 transition-colors border-slate-100 group">
+                      <TableCell className="py-4">
+                        <div className="flex flex-col gap-1">
+                          <span className="font-bold text-slate-900 text-base leading-none">{moa.companyName}</span>
+                          <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">{moa.hteId}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="font-bold border-slate-200 text-slate-600 bg-slate-100/50">
+                          {moa.industryType}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-slate-800">{moa.contactPerson}</span>
+                          <span className="text-xs text-slate-500 font-medium">{moa.contactPersonEmail}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-600 font-bold">
+                        {moa.effectiveDate}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-500 font-medium">
+                        {moa.college}
+                      </TableCell>
+                      <TableCell>
+                        {getStatusBadge(moa.status)}
+                      </TableCell>
+                      <TableCell className="text-right pr-6">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
         </div>
         <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex items-center justify-between">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            Displaying {filteredMoas.length} of {MOCK_MOAS.length} Total Institutional Records
+            Displaying {filteredMoas.length} of {moas?.length || 0} Total Institutional Records
           </p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled className="text-xs font-bold border-slate-300">Previous</Button>
