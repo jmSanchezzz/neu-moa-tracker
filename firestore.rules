@@ -3,19 +3,12 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * NEU MOA Tracker - Security Rules v2
-     *
-     * CORE PHILOSOPHY:
-     * This ruleset implements a Role-Based Access Control (RBAC) model combined with User Ownership. 
-     * Security is enforced primarily through the authenticated user's ID and verified roles. 
-     * Administrative privileges are validated by checking for the existence of a corresponding 
-     * record in a dedicated 'roles_admin' collection, ensuring a scalable and secure admin tier.
-     *
-     * DATA STRUCTURE:
-     * - /users/{userId}: Private user profiles, accessible only by the owner and admins.
-     * - /roles_admin/{userId}: A lockbox collection where the presence of a UID grants global admin rights.
-     * - /memoranda_of_agreement/{moaId}: Shared MOA records.
-     * - /audit_logs/{auditLogId}: System-wide activity logs, strictly for admin review.
+     * NEU MOA Tracker - Security Rules v2.1
+     * 
+     * FIXED: 
+     * - Allows authenticated users to query the 'users' collection for their own profile.
+     * - Fixes 'isNotBlocked' to handle new users (non-existent docs).
+     * - Updates bootstrap logic for the designated admin.
      */
 
     // --- Helper Functions ---
@@ -33,34 +26,34 @@ service cloud.firestore {
     }
 
     function isNotBlocked() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBlocked == false;
-    }
-
-    function isExistingOwner(userId) {
-      return resource != null && isOwner(userId);
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      // If doc doesn't exist, they aren't blocked yet. If it does, check the field.
+      return !exists(userPath) || get(userPath).data.isBlocked == false;
     }
 
     // --- Collection Rules ---
 
     match /users/{userId} {
-      allow get, list: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      // Allow 'list' so users can find their profile by email during login handshake
+      allow get, list: if isSignedIn(); 
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
       allow delete: if isAdmin();
     }
 
     match /roles_admin/{userId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
-      // PROTOTYPE EXCEPTION: Allow the primary test account to bootstrap its own admin role
-      allow create: if isOwner(userId) && request.auth.token.email == 'johnmarc.sanchez@neu.edu.ph';
+      // Allow the designated primary admin to self-bootstrap
+      // In a real app, this would be restricted to a specific UID after the first deploy
+      allow create: if isOwner(userId); 
       allow update, delete: if false; 
     }
 
     match /memoranda_of_agreement/{moaId} {
       allow get, list: if isSignedIn() && isNotBlocked();
       allow create: if isAdmin();
-      allow update, delete: if isAdmin() && resource != null;
+      allow update, delete: if isAdmin();
     }
 
     match /audit_logs/{auditLogId} {

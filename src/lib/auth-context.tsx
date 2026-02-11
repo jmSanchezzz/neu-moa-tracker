@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
@@ -38,6 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (firebaseUser && storedEmail) {
         try {
+          // Look up user by email
           const usersRef = collection(db, 'users');
           const q = query(usersRef, where('email', '==', storedEmail));
           const querySnapshot = await getDocs(q);
@@ -76,7 +76,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
+      // First, sign in anonymously
       await signInAnonymously(auth);
+      const currentUid = auth.currentUser?.uid;
+
+      if (!currentUid) throw new Error("Failed to initialize session.");
       
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('email', '==', email));
@@ -87,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!querySnapshot.empty) {
         userData = querySnapshot.docs[0].data() as User;
         
-        // Ensure hardcoded test users have their roles synced even if modified in DB for testing stability
+        // Ensure hardcoded test users have their roles synced
         let needsSync = false;
         if (email === 'johnmarc.sanchez@neu.edu.ph' && (userData.role !== 'ADMIN' || !userData.canEdit)) {
           userData.role = 'ADMIN';
@@ -106,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (needsSync) {
           await setDoc(doc(db, 'users', userData.id), { role: userData.role, canEdit: userData.canEdit }, { merge: true });
           if (userData.role === 'ADMIN') {
-            await setDoc(doc(db, 'roles_admin', userData.id), { uid: userData.id });
+            await setDoc(doc(db, 'roles_admin', userData.id), { uid: userData.id }, { merge: true });
           }
         }
 
@@ -120,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
       } else {
-        // Determine role based on hardcoded test addresses
+        // Create new profile based on test credentials
         let role: UserRole = 'STUDENT';
         let canEdit = false;
 
@@ -135,10 +139,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           canEdit = false;
         }
 
-        const newUid = auth.currentUser?.uid || Date.now().toString();
-        
         userData = {
-          id: newUid,
+          id: currentUid,
           name: email.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
           email: email,
           role: role,
@@ -146,10 +148,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           canEdit: canEdit,
         };
 
-        await setDoc(doc(db, 'users', newUid), userData);
+        await setDoc(doc(db, 'users', currentUid), userData);
         
         if (role === 'ADMIN') {
-          await setDoc(doc(db, 'roles_admin', newUid), { uid: newUid });
+          await setDoc(doc(db, 'roles_admin', currentUid), { uid: currentUid });
         }
 
         toast({
@@ -163,6 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       router.push('/dashboard');
       
     } catch (error: any) {
+      console.error("Login error:", error);
       toast({
         variant: "destructive",
         title: "System Error",
