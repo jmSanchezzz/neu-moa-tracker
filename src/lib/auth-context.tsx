@@ -31,7 +31,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const db = useFirestore();
   const { toast } = useToast();
 
-  // Handle session persistence during the testing phase
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setIsLoading(true);
@@ -39,7 +38,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (firebaseUser && storedEmail) {
         try {
-          // In testing mode, we use email as a lookup key for simulated sessions
           const usersRef = collection(db, 'users');
           const q = query(usersRef, where('email', '==', storedEmail));
           const querySnapshot = await getDocs(q);
@@ -78,10 +76,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // 1. Authenticate anonymously to satisfy Firestore security rules
       await signInAnonymously(auth);
       
-      // 2. Lookup or create user profile based on email
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('email', '==', email));
       const querySnapshot = await getDocs(q);
@@ -90,6 +86,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!querySnapshot.empty) {
         userData = querySnapshot.docs[0].data() as User;
+        
+        // Ensure hardcoded test users have their roles synced even if modified in DB for testing stability
+        let needsSync = false;
+        if (email === 'johnmarc.sanchez@neu.edu.ph' && (userData.role !== 'ADMIN' || !userData.canEdit)) {
+          userData.role = 'ADMIN';
+          userData.canEdit = true;
+          needsSync = true;
+        } else if (email === 'faculty@neu.edu.ph' && (userData.role !== 'FACULTY' || !userData.canEdit)) {
+          userData.role = 'FACULTY';
+          userData.canEdit = true;
+          needsSync = true;
+        } else if (email === 'student@neu.edu.ph' && (userData.role !== 'STUDENT' || userData.canEdit)) {
+          userData.role = 'STUDENT';
+          userData.canEdit = false;
+          needsSync = true;
+        }
+
+        if (needsSync) {
+          await setDoc(doc(db, 'users', userData.id), { role: userData.role, canEdit: userData.canEdit }, { merge: true });
+          if (userData.role === 'ADMIN') {
+            await setDoc(doc(db, 'roles_admin', userData.id), { uid: userData.id });
+          }
+        }
+
         if (userData.isBlocked) {
           toast({
             variant: "destructive",
@@ -100,32 +120,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
       } else {
-        // Create new profile for first-time login
-        const isDefaultAdmin = email === 'johnmarc.sanchez@neu.edu.ph';
+        // Determine role based on hardcoded test addresses
+        let role: UserRole = 'STUDENT';
+        let canEdit = false;
+
+        if (email === 'johnmarc.sanchez@neu.edu.ph') {
+          role = 'ADMIN';
+          canEdit = true;
+        } else if (email === 'faculty@neu.edu.ph') {
+          role = 'FACULTY';
+          canEdit = true;
+        } else if (email === 'student@neu.edu.ph') {
+          role = 'STUDENT';
+          canEdit = false;
+        }
+
         const newUid = auth.currentUser?.uid || Date.now().toString();
         
         userData = {
           id: newUid,
           name: email.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
           email: email,
-          role: isDefaultAdmin ? 'ADMIN' : 'STUDENT',
+          role: role,
           isBlocked: false,
-          canEdit: isDefaultAdmin,
+          canEdit: canEdit,
         };
 
         await setDoc(doc(db, 'users', newUid), userData);
         
-        if (userData.role === 'ADMIN') {
+        if (role === 'ADMIN') {
           await setDoc(doc(db, 'roles_admin', newUid), { uid: newUid });
         }
 
         toast({
           title: "Profile Created",
-          description: `Logged in as ${userData.role}.`,
+          description: `Logged in as ${role}.`,
         });
       }
 
-      // 3. Store session and update state
       localStorage.setItem('neu_moa_test_session', email);
       setUser(userData);
       router.push('/dashboard');
