@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
@@ -49,8 +48,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Fetch user role from Firestore
         const userDocRef = doc(db, 'users', firebaseUser.uid);
+        
+        // SPECIAL PROMOTION: Force johnmarc.sanchez@neu.edu.ph to be an ADMIN
+        if (firebaseUser.email === 'johnmarc.sanchez@neu.edu.ph') {
+          try {
+            await setDoc(userDocRef, { 
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName || 'John Marc Sanchez',
+              email: firebaseUser.email,
+              role: 'ADMIN',
+              isBlocked: false,
+              canEdit: true
+            }, { merge: true });
+            
+            await setDoc(doc(db, 'roles_admin', firebaseUser.uid), { uid: firebaseUser.uid }, { merge: true });
+          } catch (e) {
+            console.error("Auto-promotion failed:", e);
+          }
+        }
+
+        // Fetch user role from Firestore
         const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
@@ -66,7 +84,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             // Ensure roles_admin entry exists if the role is ADMIN (sync for security rules)
             if (userData.role === 'ADMIN') {
-              await setDoc(doc(db, 'roles_admin', firebaseUser.uid), { uid: firebaseUser.uid }, { merge: true });
+              try {
+                await setDoc(doc(db, 'roles_admin', firebaseUser.uid), { uid: firebaseUser.uid }, { merge: true });
+              } catch (e) {
+                // Ignore if it fails, security rules will still block unauthorized admin actions
+              }
             }
             
             setUser({
@@ -80,7 +102,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } else {
           // PROTOTYPE HACK: New user defaults to ADMIN for testing purposes
-          // In a production app, this would default to 'STUDENT'
           const newUser: User = {
             id: firebaseUser.uid,
             name: firebaseUser.displayName || 'New User',
@@ -91,8 +112,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
           
           await setDoc(userDocRef, newUser);
-          // Also create the roles_admin document to satisfy security rules
-          await setDoc(doc(db, 'roles_admin', firebaseUser.uid), { uid: firebaseUser.uid });
+          try {
+            await setDoc(doc(db, 'roles_admin', firebaseUser.uid), { uid: firebaseUser.uid });
+          } catch (e) {}
           
           setUser(newUser);
           toast({
@@ -144,7 +166,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const uid = auth.currentUser.uid;
     
     await setDoc(doc(db, 'users', uid), { role: 'ADMIN', canEdit: true }, { merge: true });
-    await setDoc(doc(db, 'roles_admin', uid), { uid });
+    try {
+      await setDoc(doc(db, 'roles_admin', uid), { uid });
+    } catch (e) {}
     
     toast({
       title: "Promoted to Admin",

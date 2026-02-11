@@ -16,52 +16,32 @@ service cloud.firestore {
      * - /roles_admin/{userId}: A lockbox collection where the presence of a UID grants global admin rights.
      * - /memoranda_of_agreement/{moaId}: Shared MOA records.
      * - /audit_logs/{auditLogId}: System-wide activity logs, strictly for admin review.
-     *
-     * KEY SECURITY DECISIONS:
-     * 1. Blocked Status: User access is contingent on the 'isBlocked' flag within their User profile.
-     * 2. Denormalization for Authorization: The 'endorsedByCollege' field is stored directly on MOA 
-     *    documents to allow for performant, college-specific filtering without expensive cross-document lookups.
-     * 3. Prototyping Flexibility: Rules strictly enforce 'who' can write, but are flexible on 'what' 
-     *    the data looks like (schema-agnostic) to support rapid development.
-     * 4. Relational Integrity: On user creation, we enforce that the internal 'id' matches the path 'userId'.
      */
 
     // --- Helper Functions ---
 
-    /** @description Checks if the request is from an authenticated user. */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /** @description Checks if the user's UID matches the provided userId. */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    /** @description Verifies a user is an admin by checking the roles_admin collection. */
     function isAdmin() {
       return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
-    /** @description Checks if the authenticated user is currently blocked from the system. */
     function isNotBlocked() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBlocked == false;
     }
 
-    /** @description Combines ownership and existence checks for updates and deletes. */
     function isExistingOwner(userId) {
       return resource != null && isOwner(userId);
     }
 
     // --- Collection Rules ---
 
-    /**
-     * @description User profiles containing identity and role information.
-     * @path /users/{userId}
-     * @allow (get, list, create, update) if the user is accessing their own document.
-     * @deny (all) if the UID does not match the document ID or user is blocked.
-     * @principle Ownership - Users manage their own profile; Path-to-Data consistency is enforced.
-     */
     match /users/{userId} {
       allow get, list: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) && request.resource.data.id == userId;
@@ -69,40 +49,20 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    /**
-     * @description A restricted collection used to verify administrative privileges.
-     * @path /roles_admin/{userId}
-     * @allow (get) if signed in.
-     * @deny (list, write) for all standard users to prevent role escalation.
-     * @principle Role-Based Access Control - Centralized admin verification.
-     */
     match /roles_admin/{userId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
-      allow create, update, delete: if false; // System-managed via Admin SDK or Cloud Functions only.
+      // PROTOTYPE EXCEPTION: Allow the primary test account to bootstrap its own admin role
+      allow create: if isOwner(userId) && request.auth.token.email == 'johnmarc.sanchez@neu.edu.ph';
+      allow update, delete: if false; 
     }
 
-    /**
-     * @description MOA records shared across the organization.
-     * @path /memoranda_of_agreement/{moaId}
-     * @allow (get, list) if the user is authenticated and not blocked.
-     * @allow (create, update, delete) only for users with Admin privileges.
-     * @deny (write) for Faculty and Students to maintain data integrity.
-     * @principle Shared Access - Read access for all valid users; Write access restricted by Role.
-     */
     match /memoranda_of_agreement/{moaId} {
       allow get, list: if isSignedIn() && isNotBlocked();
       allow create: if isAdmin();
       allow update, delete: if isAdmin() && resource != null;
     }
 
-    /**
-     * @description System audit logs for tracking database operations.
-     * @path /audit_logs/{auditLogId}
-     * @allow (all) restricted exclusively to Admin users.
-     * @deny (all) for any non-admin user.
-     * @principle Structural Segregation - Logs are isolated and secured for administrative oversight.
-     */
     match /audit_logs/{auditLogId} {
       allow get, list, create, update, delete: if isAdmin();
     }
