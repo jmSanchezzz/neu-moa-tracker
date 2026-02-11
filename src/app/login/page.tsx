@@ -1,19 +1,23 @@
+
 "use client";
 
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { ShieldCheck, Mail } from 'lucide-react';
+import { ShieldCheck, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const { login } = useAuth();
+  const { login, isLoading } = useAuth();
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    login(email);
+  const handleGoogleSignIn = async () => {
+    setIsLoggingIn(true);
+    try {
+      await login();
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   return (
@@ -26,27 +30,24 @@ export default function LoginPage() {
           <CardTitle className="text-2xl font-bold font-headline text-primary">NEU MOA Tracker</CardTitle>
           <CardDescription> Institutional Google Login </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="name@neu.edu.ph"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10"
-                  required
-                />
-              </div>
-            </div>
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
-              Sign In with Google
-            </Button>
-          </form>
+        <CardContent className="space-y-4">
+          <div className="p-4 bg-muted rounded-lg text-sm text-center">
+            Click the button below to sign in with your <b>@neu.edu.ph</b> account.
+          </div>
+          <Button 
+            onClick={handleGoogleSignIn} 
+            className="w-full bg-primary hover:bg-primary/90 h-12 text-base"
+            disabled={isLoggingIn || isLoading}
+          >
+            {isLoggingIn ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              "Sign In with Google"
+            )}
+          </Button>
         </CardContent>
         <CardFooter className="flex flex-col text-center text-xs text-muted-foreground">
           <p>This application is for official NEU use only.</p>

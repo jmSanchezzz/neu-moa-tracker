@@ -1,13 +1,22 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, MOCK_USERS } from '@/lib/mock-data';
 import { useRouter } from 'next/navigation';
+import { 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signOut, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { useAuth as useFirebaseAuth, useFirestore } from '@/firebase';
+import { User, UserRole } from '@/lib/mock-data';
 
 type AuthContextType = {
   user: User | null;
-  login: (email: string) => void;
-  logout: () => void;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
   isLoading: boolean;
 };
 
@@ -17,39 +26,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const auth = useFirebaseAuth();
+  const db = useFirestore();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('neu_moa_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
-  }, []);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setIsLoading(true);
+      if (firebaseUser) {
+        // Institutional email check
+        if (!firebaseUser.email?.endsWith('@neu.edu.ph')) {
+          await signOut(auth);
+          alert('Only institutional @neu.edu.ph emails are allowed.');
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
 
-  const login = (email: string) => {
-    // Basic institutional email check
-    if (!email.endsWith('@neu.edu.ph')) {
-      alert('Only institutional Google emails are allowed.');
-      return;
-    }
+        // Fetch user role from Firestore
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
 
-    const foundUser = MOCK_USERS.find(u => u.email === email);
-    if (foundUser) {
-      if (foundUser.isBlocked) {
-        alert('Your account is blocked.');
-        return;
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (userData.isBlocked) {
+            await signOut(auth);
+            alert('Your account is blocked.');
+            setUser(null);
+          } else {
+            setUser({
+              id: firebaseUser.uid,
+              name: userData.name || firebaseUser.displayName || 'User',
+              email: firebaseUser.email,
+              role: userData.role as UserRole,
+              isBlocked: false,
+              canEdit: userData.canEdit || false,
+            });
+          }
+        } else {
+          // New user defaults to STUDENT
+          const newUser: User = {
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || 'New User',
+            email: firebaseUser.email,
+            role: 'STUDENT',
+            isBlocked: false,
+            canEdit: false,
+          };
+          await setDoc(userDocRef, newUser);
+          setUser(newUser);
+        }
+      } else {
+        setUser(null);
       }
-      setUser(foundUser);
-      localStorage.setItem('neu_moa_user', JSON.stringify(foundUser));
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [auth, db]);
+
+  const login = async () => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ hd: 'neu.edu.ph' });
+    try {
+      await signInWithPopup(auth, provider);
       router.push('/dashboard');
-    } else {
-      alert('User not found. Contact Admin for registration.');
+    } catch (error: any) {
+      console.error("Login Error:", error);
+      if (error.code !== 'auth/popup-closed-by-user') {
+        alert("Authentication failed: " + error.message);
+      }
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await signOut(auth);
     setUser(null);
-    localStorage.removeItem('neu_moa_user');
     router.push('/login');
   };
 

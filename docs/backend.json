@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -8,40 +9,35 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the User entity."
-        },
-        "googleId": {
-          "type": "string",
-          "description": "The Google ID of the user, used for authentication."
+          "description": "Unique identifier for the User entity (matches Firebase UID)."
         },
         "email": {
           "type": "string",
           "description": "The user's email address.",
           "format": "email"
         },
-        "firstName": {
+        "name": {
           "type": "string",
-          "description": "The user's first name."
-        },
-        "lastName": {
-          "type": "string",
-          "description": "The user's last name."
+          "description": "The user's full name."
         },
         "role": {
           "type": "string",
-          "description": "The role of the user (Admin, Faculty, Student)."
+          "description": "The role of the user (ADMIN, FACULTY, STUDENT).",
+          "enum": ["ADMIN", "FACULTY", "STUDENT"]
         },
         "isBlocked": {
           "type": "boolean",
           "description": "Indicates if the user is blocked from accessing the system."
+        },
+        "canEdit": {
+          "type": "boolean",
+          "description": "Specific permission for Faculty to edit MOAs."
         }
       },
       "required": [
         "id",
-        "googleId",
         "email",
-        "firstName",
-        "lastName",
+        "name",
         "role",
         "isBlocked"
       ]
@@ -138,7 +134,7 @@
         },
         "operation": {
           "type": "string",
-          "description": "The operation performed (insert, edit, delete)."
+          "description": "The operation performed (INSERT, EDIT, DELETE, RECOVER)."
         }
       },
       "required": [
@@ -152,8 +148,7 @@
   },
   "auth": {
     "providers": [
-      "password",
-      "anonymous"
+      "google"
     ]
   },
   "firestore": {
@@ -223,6 +218,6 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to support role-based access control and efficient MOA management within the NEU MOA Tracker application. It emphasizes authorization independence, clarity, and scalability.\n\n*   `/users/{userId}`: Stores user profiles.  Authorization is based on the authenticated user's ID. The `role` field determines access to other parts of the database. No other data is stored here. Access control is simplified to `request.auth.uid == userId`.\n*   `/roles_admin/{userId}`: Documents exist only if the user is an admin. Used in rules with `exists()` to grant admin privileges.\n*   `/memoranda_of_agreement/{moaId}`: Stores MOA records. To ensure Authorization Independence, the `endorsedByCollege` field is denormalized into each MOA document. This allows faculty to filter MOAs by college without requiring complex `get()` calls in security rules.\n*   `/audit_logs/{auditLogId}`: Stores audit logs.  This collection is separate to limit access to only admin users.\n\n**Authorization Independence:**\nThe design ensures authorization independence by denormalizing the `endorsedByCollege` field within each MOA document. This eliminates the need for security rules to perform `get()` operations on parent documents to determine access, thereby enabling atomic operations and simplifying security rules.\n\n**QAPs (Rules are not Filters):**\n\n*   The segregation of MOAs into a single collection (`/memoranda_of_agreement`) and the denormalization of `endorsedByCollege` ensure that `list` operations are secure. Rules can filter MOAs based on the denormalized `endorsedByCollege` field, without allowing unauthorized access to other MOAs.\n*   Admin role is checked via existence in `/roles_admin/{userId}`. This ensures scalable role management.\n*   Student role is implicitly granted if they are authenticated and not blocked, so approved MOAs are automatically visible without any further checks."
+    "reasoning": "The Firestore structure is designed to support role-based access control and efficient MOA management within the NEU MOA Tracker application."
   }
 }
