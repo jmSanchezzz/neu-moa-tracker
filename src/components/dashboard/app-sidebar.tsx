@@ -31,6 +31,7 @@ export function AppSidebar() {
   if (!user) return null;
 
   const isAdmin = user.role === 'ADMIN';
+  const isStudent = user.role === 'STUDENT';
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" className="bg-sidebar text-sidebar-foreground border-r-0">
@@ -51,14 +52,16 @@ export function AppSidebar() {
           <SidebarGroupLabel className="text-white/40 font-black text-[10px] uppercase tracking-[0.2em] mb-2 px-4">Core Navigator</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Dashboard" className="hover:bg-sidebar-accent hover:text-white h-10 px-4 group">
-                  <a href="/dashboard">
-                    <LayoutDashboard className="group-hover:text-accent transition-colors" />
-                    <span className="font-bold">Command Center</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {!isStudent && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Dashboard" className="hover:bg-sidebar-accent hover:text-white h-10 px-4 group">
+                    <a href="/dashboard">
+                      <LayoutDashboard className="group-hover:text-accent transition-colors" />
+                      <span className="font-bold">Command Center</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="MOAs" className="hover:bg-sidebar-accent hover:text-white h-10 px-4 group">
                   <a href="/dashboard/moas">
@@ -67,14 +70,16 @@ export function AppSidebar() {
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Archived" className="hover:bg-sidebar-accent hover:text-white h-10 px-4 group">
-                  <a href="/dashboard/moas?filter=deleted">
-                    <Archive className="group-hover:text-accent transition-colors" />
-                    <span className="font-bold">Archived / Trash</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {!isStudent && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Archived" className="hover:bg-sidebar-accent hover:text-white h-10 px-4 group">
+                    <a href="/dashboard/moas?filter=deleted">
+                      <Archive className="group-hover:text-accent transition-colors" />
+                      <span className="font-bold">Archived / Trash</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

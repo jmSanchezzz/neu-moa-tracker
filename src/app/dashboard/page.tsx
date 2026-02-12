@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { MoaStats } from "@/components/moa/moa-stats";
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,17 +41,26 @@ import { MOCK_MOAS } from "@/lib/mock-data";
 import { useToast } from "@/hooks/use-toast";
 import { EditMoaDialog } from "@/components/moa/edit-moa-dialog";
 import { MOA } from "@/lib/mock-data";
+import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const db = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [collegeFilter, setCollegeFilter] = useState("all");
   const [industryFilter, setIndustryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isSeeding, setIsSeeding] = useState(false);
   const [editingMoa, setEditingMoa] = useState<MOA | null>(null);
+
+  // Redirect Students away from the Command Center
+  useEffect(() => {
+    if (user && user.role === 'STUDENT') {
+      router.push('/dashboard/moas');
+    }
+  }, [user, router]);
 
   const moaQuery = useMemoFirebase(() => {
     if (!db) return null;
@@ -63,7 +72,7 @@ export default function DashboardPage() {
 
   const { data: moas, isLoading } = useCollection(moaQuery);
 
-  if (!user) return null;
+  if (!user || user.role === 'STUDENT') return null;
 
   const isAdmin = user.role === 'ADMIN';
   const isFaculty = user.role === 'FACULTY';
