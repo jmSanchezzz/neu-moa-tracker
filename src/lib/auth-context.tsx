@@ -8,7 +8,7 @@ import {
   signOut, 
   onAuthStateChanged 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { useAuth as useFirebaseAuth, useFirestore } from '@/firebase';
 import { User, UserRole } from '@/lib/mock-data';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +28,12 @@ const ADMIN_EMAILS = [
   'johnmarc.sanchez@neu.edu.ph', 
   'johnmarc@neu.edu.ph',
   'admin@neu.edu.ph'
+];
+
+// Recognized Faculty Emails
+const FACULTY_EMAILS = [
+  'faculty@neu.edu.ph',
+  'professor@neu.edu.ph'
 ];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -74,6 +80,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithEmail = async (email: string) => {
     const normalizedEmail = email.toLowerCase().trim();
+    
+    // Strict domain check for institutional access
     if (!normalizedEmail.endsWith('@neu.edu.ph')) {
       toast({
         variant: "destructive",
@@ -84,14 +92,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
+      // Simulate institutional OAuth via anonymous sign-in bridge for the prototype
       await signInAnonymously(auth);
       const currentUid = auth.currentUser?.uid;
 
       if (!currentUid) throw new Error("Failed to initialize session.");
       
       const isAdmin = ADMIN_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
-      const isFaculty = normalizedEmail === 'faculty@neu.edu.ph';
+      const isFaculty = FACULTY_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
 
+      // Default Role Assignment: Anyone with @neu.edu.ph is a STUDENT unless specified
       let role: UserRole = 'STUDENT';
       let canEdit = false;
 
@@ -103,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         canEdit = true;
       }
 
-      // Cleanup duplicate records for the same email (to prevent IAM clutter)
+      // Cleanup duplicate records for the same email (IAM Clutter Prevention)
       const q = query(collection(db, 'users'), where('email', '==', normalizedEmail));
       const oldUsers = await getDocs(q);
       const batch = writeBatch(db);
@@ -111,22 +121,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       oldUsers.forEach((oldDoc) => {
         if (oldDoc.id !== currentUid) {
           batch.delete(oldDoc.ref);
-          // Also cleanup admin docs if they existed for that old UID
           batch.delete(doc(db, 'roles_admin', oldDoc.id));
         }
       });
 
-      // Prepare user data
+      // Generate Name from Email (e.g., juan.dela.cruz@neu.edu.ph -> Juan Dela Cruz)
+      const nameParts = normalizedEmail.split('@')[0].split('.');
+      const formattedName = nameParts
+        .map(s => s.charAt(0).toUpperCase() + s.slice(1))
+        .join(' ');
+
       const userData: User = {
         id: currentUid,
-        name: normalizedEmail.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
+        name: formattedName,
         email: normalizedEmail,
         role: role,
         isBlocked: false,
         canEdit: canEdit,
       };
 
-      // Save user record and admin status in the same batch
+      // Atomic write for user profile and admin privileges
       batch.set(doc(db, 'users', currentUid), userData, { merge: true });
       if (role === 'ADMIN') {
         batch.set(doc(db, 'roles_admin', currentUid), { uid: currentUid, email: normalizedEmail }, { merge: true });
@@ -139,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       toast({
         title: "Access Granted",
-        description: `Logged in as ${role}. Registry synchronized.`,
+        description: `Logged in as ${role}. Institutional registry synchronized.`,
       });
 
       router.push('/dashboard');
@@ -149,7 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast({
         variant: "destructive",
         title: "System Error",
-        description: error.message || "Could not complete login process.",
+        description: "Institutional verification failed. Please check your connection.",
       });
     }
   };
@@ -163,8 +177,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const promoteToAdmin = async () => {
     if (!user) return;
-    await setDoc(doc(db, 'users', user.id), { role: 'ADMIN', canEdit: true }, { merge: true });
-    await setDoc(doc(db, 'roles_admin', user.id), { uid: user.id }, { merge: true });
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'users', user.id), { role: 'ADMIN', canEdit: true });
+    batch.set(doc(db, 'roles_admin', user.id), { uid: user.id }, { merge: true });
+    await batch.commit();
+    
     toast({
       title: "Elevated to Admin",
       description: "You now have full system control.",
