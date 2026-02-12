@@ -8,7 +8,7 @@ import {
   signOut, 
   onAuthStateChanged 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, writeBatch } from 'firebase/firestore';
 import { useAuth as useFirebaseAuth, useFirestore } from '@/firebase';
 import { User, UserRole } from '@/lib/mock-data';
 import { useToast } from '@/hooks/use-toast';
@@ -56,6 +56,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
               setUser(userData);
             }
+          } else {
+            // Re-bootstrap user if doc missing but email session exists
+            await loginWithEmail(storedEmail);
           }
         } catch (e) {
           console.error("Auth sync error:", e);
@@ -100,6 +103,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         canEdit = true;
       }
 
+      // Cleanup duplicate records for the same email (to prevent IAM clutter)
+      const q = query(collection(db, 'users'), where('email', '==', normalizedEmail));
+      const oldUsers = await getDocs(q);
+      const batch = writeBatch(db);
+      
+      oldUsers.forEach((oldDoc) => {
+        if (oldDoc.id !== currentUid) {
+          batch.delete(oldDoc.ref);
+          // Also cleanup admin docs if they existed for that old UID
+          batch.delete(doc(db, 'roles_admin', oldDoc.id));
+        }
+      });
+
       // Prepare user data
       const userData: User = {
         id: currentUid,
@@ -110,20 +126,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         canEdit: canEdit,
       };
 
-      // Save user record
-      await setDoc(doc(db, 'users', currentUid), userData, { merge: true });
-      
-      // Sync admin status for security rules
+      // Save user record and admin status in the same batch
+      batch.set(doc(db, 'users', currentUid), userData, { merge: true });
       if (role === 'ADMIN') {
-        await setDoc(doc(db, 'roles_admin', currentUid), { uid: currentUid, email: normalizedEmail }, { merge: true });
+        batch.set(doc(db, 'roles_admin', currentUid), { uid: currentUid, email: normalizedEmail }, { merge: true });
       }
+      
+      await batch.commit();
 
       localStorage.setItem('neu_moa_test_session', normalizedEmail);
       setUser(userData);
       
       toast({
         title: "Access Granted",
-        description: `Logged in as ${role}.`,
+        description: `Logged in as ${role}. Registry synchronized.`,
       });
 
       router.push('/dashboard');

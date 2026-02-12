@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { 
   Table, 
@@ -42,7 +42,21 @@ export default function UsersPage() {
     return query(collection(db, "users"));
   }, [db]);
 
-  const { data: users, isLoading } = useCollection(usersQuery);
+  const { data: rawUsers, isLoading } = useCollection(usersQuery);
+
+  // Filter users to show only the most recent entry per unique email
+  // This prevents "ghost" sessions from appearing as duplicates in the IAM list
+  const users = useMemo(() => {
+    if (!rawUsers) return [];
+    const uniqueUsersMap = new Map<string, User>();
+    
+    // Sort so later entries (newer sessions) overwrite earlier ones
+    [...rawUsers].forEach(u => {
+      uniqueUsersMap.set(u.email.toLowerCase(), u as any);
+    });
+    
+    return Array.from(uniqueUsersMap.values());
+  }, [rawUsers]);
 
   if (!currentUser || currentUser.role !== 'ADMIN') return null;
 
@@ -105,75 +119,83 @@ export default function UsersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users?.map((u) => (
-                <TableRow key={u.id} className="hover:bg-slate-50 transition-colors border-slate-100">
-                  <TableCell className="py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-slate-100 p-2 rounded-full">
-                        <UserIcon className="h-4 w-4 text-slate-500" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="font-bold text-slate-900">{u.name}</span>
-                        <span className="text-xs text-slate-500 font-medium">{u.email}</span>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {getRoleBadge(u.role)}
-                  </TableCell>
-                  <TableCell>
-                    {u.isBlocked ? (
-                      <Badge variant="destructive" className="font-bold">Blocked</Badge>
-                    ) : (
-                      <Badge className="bg-green-100 text-green-800 border-green-200 font-bold">Active</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <Switch 
-                        checked={u.canEdit} 
-                        disabled={u.role === 'ADMIN' || u.id === currentUser.id} 
-                        onCheckedChange={() => handleToggleEditRights(u as any)}
-                      />
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-tighter">
-                        {u.canEdit ? 'Enabled' : 'Disabled'}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right pr-6">
-                    <div className="flex justify-end gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="font-bold text-primary hover:bg-primary/10"
-                        onClick={() => setEditingUser(u as any)}
-                      >
-                        <Edit2 className="h-3.5 w-3.5 mr-1.5" /> Edit
-                      </Button>
-                      {u.isBlocked ? (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="font-bold text-green-600 border-green-200 hover:bg-green-50"
-                          onClick={() => handleToggleBlock(u as any)}
-                        >
-                          <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Unblock
-                        </Button>
-                      ) : (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="font-bold text-destructive border-destructive/20 hover:bg-red-50"
-                          disabled={u.id === currentUser.id}
-                          onClick={() => handleToggleBlock(u as any)}
-                        >
-                          <UserX className="h-3.5 w-3.5 mr-1.5" /> Block
-                        </Button>
-                      )}
-                    </div>
+              {users.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                    No registered institutional accounts found.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                users.map((u) => (
+                  <TableRow key={u.id} className="hover:bg-slate-50 transition-colors border-slate-100">
+                    <TableCell className="py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-slate-100 p-2 rounded-full">
+                          <UserIcon className="h-4 w-4 text-slate-500" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-900">{u.name}</span>
+                          <span className="text-xs text-slate-500 font-medium">{u.email}</span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {getRoleBadge(u.role)}
+                    </TableCell>
+                    <TableCell>
+                      {u.isBlocked ? (
+                        <Badge variant="destructive" className="font-bold">Blocked</Badge>
+                      ) : (
+                        <Badge className="bg-green-100 text-green-800 border-green-200 font-bold">Active</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        <Switch 
+                          checked={u.canEdit} 
+                          disabled={u.role === 'ADMIN' || u.id === currentUser.id} 
+                          onCheckedChange={() => handleToggleEditRights(u as any)}
+                        />
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-tighter">
+                          {u.canEdit ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right pr-6">
+                      <div className="flex justify-end gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="font-bold text-primary hover:bg-primary/10"
+                          onClick={() => setEditingUser(u as any)}
+                        >
+                          <Edit2 className="h-3.5 w-3.5 mr-1.5" /> Edit
+                        </Button>
+                        {u.isBlocked ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="font-bold text-green-600 border-green-200 hover:bg-green-50"
+                            onClick={() => handleToggleBlock(u as any)}
+                          >
+                            <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Unblock
+                          </Button>
+                        ) : (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="font-bold text-destructive border-destructive/20 hover:bg-red-50"
+                            disabled={u.id === currentUser.id || u.email === currentUser.email}
+                            onClick={() => handleToggleBlock(u as any)}
+                          >
+                            <UserX className="h-3.5 w-3.5 mr-1.5" /> Block
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         )}
