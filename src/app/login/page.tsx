@@ -30,11 +30,11 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4 font-body">
       <Card className="w-full max-w-md shadow-2xl border-t-4 border-t-accent bg-white">
         <CardHeader className="text-center pb-2">
-          <div className="mx-auto bg-primary/10 w-20 h-20 rounded-2xl flex items-center justify-center mb-4 transform rotate-3 shadow-inner">
-            <ShieldCheck className="w-12 h-12 text-primary" />
+          <div className="mx-auto bg-sidebar/10 w-20 h-20 rounded-2xl flex items-center justify-center mb-4 transform rotate-3 shadow-inner">
+            <ShieldCheck className="w-12 h-12 text-sidebar" />
           </div>
           <CardTitle className="text-3xl font-black font-headline text-sidebar uppercase tracking-tighter">
-            NEU <span className="text-primary">MOA</span> TRACKER
+            NEU MOA TRACKER
           </CardTitle>
           <CardDescription className="font-bold text-muted-foreground uppercase tracking-widest text-[10px] mt-1"> 
             Institutional Access Gateway 
@@ -42,7 +42,7 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent className="space-y-6 pt-6">
           <div className="p-4 bg-slate-50 rounded-xl text-xs text-center border border-slate-100 font-medium text-slate-600 leading-relaxed">
-            Authorized Personnel: Please enter your <b className="text-primary">@neu.edu.ph</b> email to access the administrative command center.
+            Authorized Personnel: Please enter your <b className="text-sidebar">@neu.edu.ph</b> email to access the administrative command center.
           </div>
           
           <form onSubmit={handleManualSignIn} className="space-y-4">
@@ -54,14 +54,14 @@ export default function LoginPage() {
                 placeholder="identity@neu.edu.ph"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="h-12 border-slate-200 focus-visible:ring-primary font-semibold"
+                className="h-12 border-slate-200 focus-visible:ring-sidebar font-semibold"
                 required
               />
             </div>
             
             <Button 
               type="submit"
-              className="w-full bg-primary hover:bg-primary/90 h-14 text-base font-black shadow-lg shadow-primary/20 transition-all active:scale-[0.98] group"
+              className="w-full bg-sidebar hover:bg-sidebar/90 text-sidebar-foreground h-14 text-base font-black shadow-lg shadow-sidebar/20 transition-all active:scale-[0.98] group"
               disabled={isLoggingIn || isLoading || !email.endsWith('@neu.edu.ph')}
             >
               {isLoggingIn ? (
