@@ -153,7 +153,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex gap-3">
-          {isAdmin && moas?.length === 0 && (
+          {isAdmin && (
             <Button 
               variant="outline" 
               className="border-accent text-accent-foreground hover:bg-accent/10 font-bold"
@@ -275,7 +275,7 @@ export default function DashboardPage() {
                         <div>
                           <p className="text-primary font-bold text-lg">No MOA records found.</p>
                           <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                            The institutional database is currently empty. Use the <b>Create Record</b> button to add a new agreement.
+                            The institutional database is currently empty. Use the <b>Create Record</b> button or <b>Seed Sample Data</b> to begin.
                           </p>
                         </div>
                         {isAdmin && (
