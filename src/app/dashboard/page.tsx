@@ -26,7 +26,6 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Search, 
   Filter, 
-  Calendar as CalendarIcon, 
   Edit, 
   Trash2, 
   FileSpreadsheet,
@@ -114,11 +113,10 @@ export default function DashboardPage() {
         description: `${MOCK_MOAS.length} institutional records populated.`,
       });
     } catch (error: any) {
-      // Emit contextual error for security rules debugging
       errorEmitter.emit('permission-error', new FirestorePermissionError({
         path: 'memoranda_of_agreement',
         operation: 'create',
-        requestResourceData: MOCK_MOAS[0], // Representative sample
+        requestResourceData: MOCK_MOAS[0],
       }));
 
       toast({

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -17,10 +18,10 @@ import { UserPlus, UserX, Loader2, Edit2, ShieldCheck, User as UserIcon } from "
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, doc, setDoc } from "firebase/firestore";
+import { collection, query, doc } from "firebase/firestore";
 import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { useToast } from "@/hooks/use-toast";
-import { User, UserRole } from "@/lib/mock-data";
+import { User } from "@/lib/mock-data";
 import { EditUserDialog } from "@/components/users/edit-user-dialog";
 
 export default function UsersPage() {

@@ -4,11 +4,11 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * NEU MOA Tracker - Security Rules v2.3
+     * NEU MOA Tracker - Security Rules v2.4
      * 
-     * UPDATED for Prototype Testing:
-     * - Admin bootstrap relies on roles_admin document.
-     * - roles_admin creation is allowed for self-management during testing.
+     * Refined for Anonymous Institutional Testing:
+     * - Allows self-bootstrap for Admins.
+     * - Robust checks for blocked status.
      */
 
     // --- Helper Functions ---
@@ -27,6 +27,8 @@ service cloud.firestore {
 
     function isNotBlocked() {
       let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      // If user doc doesn't exist yet (initial login), they are not blocked.
+      // If it exists, check the isBlocked field.
       return !exists(userPath) || get(userPath).data.isBlocked == false;
     }
 
@@ -40,9 +42,10 @@ service cloud.firestore {
     }
 
     match /roles_admin/{userId} {
+      // Allow user to check/create their own admin status
       allow get, create: if isOwner(userId);
-      allow list: if isAdmin();
-      allow update, delete: if isAdmin(); 
+      // Standard admin management
+      allow list, update, delete: if isAdmin(); 
     }
 
     match /memoranda_of_agreement/{moaId} {

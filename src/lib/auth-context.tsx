@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (firebaseUser && storedEmail) {
         try {
-          // Check for user document by UID first (the current session)
+          // Check for user document by UID first
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           
           if (userDoc.exists()) {
@@ -54,14 +54,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser(userData);
             }
           } else {
-            // If doc doesn't exist by UID, try searching by email
+            // Search by email to link sessions
             const usersRef = collection(db, 'users');
             const q = query(usersRef, where('email', '==', storedEmail));
             const querySnapshot = await getDocs(q);
 
             if (!querySnapshot.empty) {
               const userData = querySnapshot.docs[0].data() as User;
-              // Link this UID to the existing email record
               const updatedData = { ...userData, id: firebaseUser.uid };
               await setDoc(doc(db, 'users', firebaseUser.uid), updatedData);
               setUser(updatedData);
@@ -80,7 +79,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [auth, db]);
 
   const loginWithEmail = async (email: string) => {
-    if (!email.endsWith('@neu.edu.ph')) {
+    const normalizedEmail = email.toLowerCase().trim();
+    if (!normalizedEmail.endsWith('@neu.edu.ph')) {
       toast({
         variant: "destructive",
         title: "Domain Violation",
@@ -95,9 +95,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!currentUid) throw new Error("Failed to initialize session.");
       
-      const isAdmin = ADMIN_EMAILS.includes(email);
-      const isFaculty = email === 'faculty@neu.edu.ph';
-      const isStudent = email === 'student@neu.edu.ph';
+      const isAdmin = ADMIN_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
+      const isFaculty = normalizedEmail === 'faculty@neu.edu.ph';
+      const isStudent = normalizedEmail === 'student@neu.edu.ph';
 
       let role: UserRole = 'STUDENT';
       let canEdit = false;
@@ -112,25 +112,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Check for existing user by email
       const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('email', '==', email));
+      const q = query(usersRef, where('email', '==', normalizedEmail));
       const querySnapshot = await getDocs(q);
 
       let userData: User;
 
       if (!querySnapshot.empty) {
-        userData = querySnapshot.docs[0].data() as User;
-        // Overwrite role/canEdit for hardcoded test emails
+        const existingData = querySnapshot.docs[0].data() as User;
         userData = { 
-          ...userData, 
+          ...existingData, 
           id: currentUid, 
-          role: isAdmin ? 'ADMIN' : (isFaculty ? 'FACULTY' : (isStudent ? 'STUDENT' : userData.role)),
-          canEdit: isAdmin ? true : (isFaculty ? true : (isStudent ? false : userData.canEdit))
+          role: isAdmin ? 'ADMIN' : (isFaculty ? 'FACULTY' : (isStudent ? 'STUDENT' : existingData.role)),
+          canEdit: isAdmin ? true : (isFaculty ? true : (isStudent ? false : existingData.canEdit))
         };
       } else {
         userData = {
           id: currentUid,
-          name: email.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
-          email: email,
+          name: normalizedEmail.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
+          email: normalizedEmail,
           role: role,
           isBlocked: false,
           canEdit: canEdit,
@@ -147,18 +146,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Save user record
+      // Save user record first
       await setDoc(doc(db, 'users', currentUid), userData);
       
       // If Admin, sync roles_admin for Firestore security rules
       if (userData.role === 'ADMIN') {
-        await setDoc(doc(db, 'roles_admin', currentUid), { uid: currentUid, email });
+        await setDoc(doc(db, 'roles_admin', currentUid), { uid: currentUid, email: normalizedEmail });
       } else {
-        // Clean up old admin status if role changed
         await deleteDoc(doc(db, 'roles_admin', currentUid)).catch(() => {});
       }
 
-      localStorage.setItem('neu_moa_test_session', email);
+      localStorage.setItem('neu_moa_test_session', normalizedEmail);
       setUser(userData);
       
       toast({
@@ -187,10 +185,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const promoteToAdmin = async () => {
     if (!user) return;
-    
     await setDoc(doc(db, 'users', user.id), { role: 'ADMIN', canEdit: true }, { merge: true });
     await setDoc(doc(db, 'roles_admin', user.id), { uid: user.id }, { merge: true });
-    
     toast({
       title: "Elevated to Admin",
       description: "You now have full system control.",
