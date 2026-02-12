@@ -24,7 +24,11 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Recognized Admin Emails
-const ADMIN_EMAILS = ['johnmarc.sanchez@neu.edu.ph', 'johnmarc@neu.edu.ph'];
+const ADMIN_EMAILS = [
+  'johnmarc.sanchez@neu.edu.ph', 
+  'johnmarc@neu.edu.ph',
+  'admin@neu.edu.ph'
+];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -41,7 +45,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (firebaseUser && storedEmail) {
         try {
-          // Check for user document by UID first
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           
           if (userDoc.exists()) {
@@ -52,18 +55,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser(null);
             } else {
               setUser(userData);
-            }
-          } else {
-            // Search by email to link sessions
-            const usersRef = collection(db, 'users');
-            const q = query(usersRef, where('email', '==', storedEmail));
-            const querySnapshot = await getDocs(q);
-
-            if (!querySnapshot.empty) {
-              const userData = querySnapshot.docs[0].data() as User;
-              const updatedData = { ...userData, id: firebaseUser.uid };
-              await setDoc(doc(db, 'users', firebaseUser.uid), updatedData);
-              setUser(updatedData);
             }
           }
         } catch (e) {
@@ -97,7 +88,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const isAdmin = ADMIN_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
       const isFaculty = normalizedEmail === 'faculty@neu.edu.ph';
-      const isStudent = normalizedEmail === 'student@neu.edu.ph';
 
       let role: UserRole = 'STUDENT';
       let canEdit = false;
@@ -110,50 +100,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         canEdit = true;
       }
 
-      // Check for existing user by email
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('email', '==', normalizedEmail));
-      const querySnapshot = await getDocs(q);
+      // Prepare user data
+      const userData: User = {
+        id: currentUid,
+        name: normalizedEmail.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
+        email: normalizedEmail,
+        role: role,
+        isBlocked: false,
+        canEdit: canEdit,
+      };
 
-      let userData: User;
-
-      if (!querySnapshot.empty) {
-        const existingData = querySnapshot.docs[0].data() as User;
-        userData = { 
-          ...existingData, 
-          id: currentUid, 
-          role: isAdmin ? 'ADMIN' : (isFaculty ? 'FACULTY' : (isStudent ? 'STUDENT' : existingData.role)),
-          canEdit: isAdmin ? true : (isFaculty ? true : (isStudent ? false : existingData.canEdit))
-        };
-      } else {
-        userData = {
-          id: currentUid,
-          name: normalizedEmail.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
-          email: normalizedEmail,
-          role: role,
-          isBlocked: false,
-          canEdit: canEdit,
-        };
-      }
-
-      if (userData.isBlocked) {
-        toast({
-          variant: "destructive",
-          title: "Access Revoked",
-          description: "This account has been administratively blocked.",
-        });
-        await signOut(auth);
-        return;
-      }
-
-      // Save user record first
-      await setDoc(doc(db, 'users', currentUid), userData);
+      // Save user record
+      await setDoc(doc(db, 'users', currentUid), userData, { merge: true });
       
-      // If Admin, sync roles_admin for Firestore security rules
-      if (userData.role === 'ADMIN') {
-        await setDoc(doc(db, 'roles_admin', currentUid), { uid: currentUid, email: normalizedEmail });
-      } else {
-        await deleteDoc(doc(db, 'roles_admin', currentUid)).catch(() => {});
+      // Sync admin status for security rules
+      if (role === 'ADMIN') {
+        await setDoc(doc(db, 'roles_admin', currentUid), { uid: currentUid, email: normalizedEmail }, { merge: true });
       }
 
       localStorage.setItem('neu_moa_test_session', normalizedEmail);
@@ -161,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       toast({
         title: "Access Granted",
-        description: `Logged in as ${userData.role}.`,
+        description: `Logged in as ${role}.`,
       });
 
       router.push('/dashboard');
@@ -171,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast({
         variant: "destructive",
         title: "System Error",
-        description: error.message,
+        description: error.message || "Could not complete login process.",
       });
     }
   };
