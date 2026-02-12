@@ -15,8 +15,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 211 36% 10%;
     
-    /* Primary set to NEU Navy: #001F3F */
-    --primary: 210 100% 12%;
+    /* Primary set to Blue: #0d73d9 (210 89% 45%) */
+    --primary: 210 89% 45%;
     --primary-foreground: 0 0% 100%;
     
     --secondary: 200 11% 92%;
@@ -25,7 +25,7 @@
     --muted: 200 11% 92%;
     --muted-foreground: 211 15% 40%;
     
-    /* NEU Gold: #D4AF37 */
+    /* NEU Gold: #D4AF37 (46 65% 52%) */
     --accent: 46 65% 52%;
     --accent-foreground: 211 36% 10%;
     
@@ -37,7 +37,10 @@
     --ring: 210 100% 12%;
     --radius: 0.5rem;
 
-    /* Sidebar - NEU Navy: #001F3F */
+    /* NEU Navy: #001F3F (210 100% 12%) */
+    --neu-navy: 210 100% 12%;
+
+    /* Sidebar - NEU Navy */
     --sidebar-background: 210 100% 12%;
     --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 46 65% 52%;
@@ -49,7 +52,6 @@
   }
 
   .dark {
-    /* Background Dark: #101922 */
     --background: 211 36% 10%;
     --foreground: 200 11% 97%;
     
@@ -59,7 +61,7 @@
     --popover: 211 36% 10%;
     --popover-foreground: 200 11% 97%;
     
-    --primary: 210 100% 12%;
+    --primary: 210 89% 45%;
     --primary-foreground: 0 0% 100%;
     
     --secondary: 211 30% 18%;
