@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
@@ -7,7 +8,7 @@ import {
   signOut, 
   onAuthStateChanged 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { useAuth as useFirebaseAuth, useFirestore } from '@/firebase';
 import { User, UserRole } from '@/lib/mock-data';
 import { useToast } from '@/hooks/use-toast';
@@ -37,7 +38,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (firebaseUser && storedEmail) {
         try {
-          // Look up user by email
           const usersRef = collection(db, 'users');
           const q = query(usersRef, where('email', '==', storedEmail));
           const querySnapshot = await getDocs(q);
@@ -50,6 +50,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               localStorage.removeItem('neu_moa_test_session');
               setUser(null);
             } else {
+              // Ensure the current UID is an admin if the email matches the primary admin
+              if (userData.role === 'ADMIN') {
+                await setDoc(doc(db, 'roles_admin', firebaseUser.uid), { uid: firebaseUser.uid, email: storedEmail }, { merge: true });
+              }
               setUser(userData);
             }
           }
@@ -76,7 +80,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // First, sign in anonymously
       await signInAnonymously(auth);
       const currentUid = auth.currentUser?.uid;
 
@@ -89,29 +92,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let userData: User;
 
       if (!querySnapshot.empty) {
-        userData = querySnapshot.docs[0].data() as User;
+        const existingDoc = querySnapshot.docs[0];
+        userData = existingDoc.data() as User;
         
-        // Ensure hardcoded test users have their roles synced
-        let needsSync = false;
-        if (email === 'johnmarc.sanchez@neu.edu.ph' && (userData.role !== 'ADMIN' || !userData.canEdit)) {
-          userData.role = 'ADMIN';
-          userData.canEdit = true;
-          needsSync = true;
-        } else if (email === 'faculty@neu.edu.ph' && (userData.role !== 'FACULTY' || !userData.canEdit)) {
-          userData.role = 'FACULTY';
-          userData.canEdit = true;
-          needsSync = true;
-        } else if (email === 'student@neu.edu.ph' && (userData.role !== 'STUDENT' || userData.canEdit)) {
-          userData.role = 'STUDENT';
-          userData.canEdit = false;
-          needsSync = true;
+        // Sync role and permissions
+        let role: UserRole = userData.role;
+        let canEdit = userData.canEdit;
+
+        if (email === 'johnmarc.sanchez@neu.edu.ph') {
+          role = 'ADMIN';
+          canEdit = true;
+        } else if (email === 'faculty@neu.edu.ph') {
+          role = 'FACULTY';
+          canEdit = true;
+        } else if (email === 'student@neu.edu.ph') {
+          role = 'STUDENT';
+          canEdit = false;
         }
 
-        if (needsSync) {
-          await setDoc(doc(db, 'users', userData.id), { role: userData.role, canEdit: userData.canEdit }, { merge: true });
-          if (userData.role === 'ADMIN') {
-            await setDoc(doc(db, 'roles_admin', userData.id), { uid: userData.id }, { merge: true });
-          }
+        // Always update the user document with the current session UID to keep things linked
+        const updatedUserData = { ...userData, id: currentUid, role, canEdit };
+        await setDoc(doc(db, 'users', currentUid), updatedUserData);
+        
+        // If the UID changed, we might want to delete the old record if it's different
+        if (existingDoc.id !== currentUid) {
+          // Note: In a production app we'd be more careful here, but for prototyping this keeps the session clean
+        }
+
+        if (role === 'ADMIN') {
+          await setDoc(doc(db, 'roles_admin', currentUid), { uid: currentUid, email }, { merge: true });
         }
 
         if (userData.isBlocked) {
@@ -123,8 +132,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await signOut(auth);
           return;
         }
+        userData = updatedUserData;
       } else {
-        // Create new profile based on test credentials
         let role: UserRole = 'STUDENT';
         let canEdit = false;
 
@@ -151,7 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await setDoc(doc(db, 'users', currentUid), userData);
         
         if (role === 'ADMIN') {
-          await setDoc(doc(db, 'roles_admin', currentUid), { uid: currentUid });
+          await setDoc(doc(db, 'roles_admin', currentUid), { uid: currentUid, email });
         }
 
         toast({

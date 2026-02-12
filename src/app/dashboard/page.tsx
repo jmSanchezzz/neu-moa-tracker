@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -34,7 +35,7 @@ import {
   PlusCircle,
   Database
 } from "lucide-react";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError } from "@/firebase";
 import { collection, query, orderBy, doc, writeBatch } from "firebase/firestore";
 import { AddMoaDialog } from "@/components/moa/add-moa-dialog";
 import { MOCK_MOAS } from "@/lib/mock-data";
@@ -55,7 +56,6 @@ export default function DashboardPage() {
   const [isSeeding, setIsSeeding] = useState(false);
   const [editingMoa, setEditingMoa] = useState<MOA | null>(null);
 
-  // Redirect Students away from the Command Center
   useEffect(() => {
     if (user && user.role === 'STUDENT') {
       router.push('/dashboard/moas');
@@ -83,9 +83,6 @@ export default function DashboardPage() {
   const filteredMoas = useMemo(() => {
     if (!moas) return [];
     return moas.filter(moa => {
-      if (user.role === 'STUDENT' && moa.status !== 'APPROVED') return false;
-      if ((user.role === 'STUDENT' || isFaculty) && moa.isDeleted) return false;
-
       const matchesSearch = 
         moa.companyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         moa.hteId.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -97,27 +94,37 @@ export default function DashboardPage() {
 
       return matchesSearch && matchesCollege && matchesIndustry && matchesStatus;
     });
-  }, [moas, searchQuery, collegeFilter, industryFilter, statusFilter, user.role, isFaculty]);
+  }, [moas, searchQuery, collegeFilter, industryFilter, statusFilter]);
 
   const seedDatabase = async () => {
     if (!db || isSeeding) return;
     setIsSeeding(true);
+    
     try {
       const batch = writeBatch(db);
       MOCK_MOAS.forEach((moa) => {
         const docRef = doc(collection(db, "memoranda_of_agreement"));
         batch.set(docRef, { ...moa, id: docRef.id });
       });
+      
       await batch.commit();
+      
       toast({
         title: "Database Seeded",
-        description: "Institutional registry populated with sample records.",
+        description: `${MOCK_MOAS.length} institutional records populated.`,
       });
-    } catch (error) {
+    } catch (error: any) {
+      // Emit contextual error for security rules debugging
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: 'memoranda_of_agreement',
+        operation: 'create',
+        requestResourceData: MOCK_MOAS[0], // Representative sample
+      }));
+
       toast({
         variant: "destructive",
         title: "Seeding Failed",
-        description: "Could not populate initial records.",
+        description: "Institutional registry write access denied. Please re-login.",
       });
     } finally {
       setIsSeeding(false);
@@ -228,11 +235,6 @@ export default function DashboardPage() {
               </SelectContent>
             </Select>
 
-            <Button variant="outline" className="gap-2 bg-white border-border font-medium">
-              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-              <span>Date Range</span>
-            </Button>
-
             {(searchQuery || collegeFilter !== "all" || industryFilter !== "all" || statusFilter !== "all") && (
               <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => {
                 setSearchQuery("");
@@ -253,8 +255,8 @@ export default function DashboardPage() {
             </div>
           ) : (
             <Table>
-              <TableHeader className="bg-sidebar text-sidebar-foreground">
-                <TableRow className="hover:bg-transparent border-sidebar-border">
+              <TableHeader className="bg-primary text-primary-foreground">
+                <TableRow className="hover:bg-transparent border-primary/20">
                   <TableHead className="w-[320px] text-white font-bold py-5">Company Entity</TableHead>
                   <TableHead className="text-white font-bold">Industry Segment</TableHead>
                   <TableHead className="text-white font-bold">Primary Contact</TableHead>
@@ -341,15 +343,6 @@ export default function DashboardPage() {
               </TableBody>
             </Table>
           )}
-        </div>
-        <div className="bg-muted/20 px-6 py-4 border-t border-border flex items-center justify-between">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-            Displaying {filteredMoas.length} of {moas?.length || 0} Total Institutional Records
-          </p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled className="text-xs font-bold border-border bg-white">Previous</Button>
-            <Button variant="outline" size="sm" disabled className="text-xs font-bold border-border bg-white">Next</Button>
-          </div>
         </div>
       </Card>
 

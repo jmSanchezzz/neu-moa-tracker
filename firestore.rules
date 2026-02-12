@@ -1,14 +1,13 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * NEU MOA Tracker - Security Rules v2.1
+     * NEU MOA Tracker - Security Rules v2.2
      * 
      * FIXED: 
-     * - Allows authenticated users to query the 'users' collection for their own profile.
-     * - Fixes 'isNotBlocked' to handle new users (non-existent docs).
-     * - Updates bootstrap logic for the designated admin.
+     * - Admin bootstrap logic to recognize the primary administrator even across session UID changes.
      */
 
     // --- Helper Functions ---
@@ -21,20 +20,26 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isPrimaryAdmin() {
+      // Allow the primary developer/admin email to bypass initial bootstrap hurdles
+      return request.auth.token.email == 'johnmarc.sanchez@neu.edu.ph';
+    }
+
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) ||
+        isPrimaryAdmin()
+      );
     }
 
     function isNotBlocked() {
       let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      // If doc doesn't exist, they aren't blocked yet. If it does, check the field.
       return !exists(userPath) || get(userPath).data.isBlocked == false;
     }
 
     // --- Collection Rules ---
 
     match /users/{userId} {
-      // Allow 'list' so users can find their profile by email during login handshake
       allow get, list: if isSignedIn(); 
       allow create: if isOwner(userId);
       allow update: if isOwner(userId) || isAdmin();
@@ -44,16 +49,13 @@ service cloud.firestore {
     match /roles_admin/{userId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
-      // Allow the designated primary admin to self-bootstrap
-      // In a real app, this would be restricted to a specific UID after the first deploy
-      allow create: if isOwner(userId); 
+      allow create: if isOwner(userId) || isPrimaryAdmin(); 
       allow update, delete: if false; 
     }
 
     match /memoranda_of_agreement/{moaId} {
       allow get, list: if isSignedIn() && isNotBlocked();
-      allow create: if isAdmin();
-      allow update, delete: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     match /audit_logs/{auditLogId} {
