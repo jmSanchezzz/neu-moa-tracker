@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser(userData);
             }
           } else {
-            // Re-bootstrap user if doc missing but email session exists
+            // If doc missing (new session for existing email), trigger re-bootstrap
             await loginWithEmail(storedEmail);
           }
         } catch (e) {
@@ -92,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // Simulate institutional OAuth via anonymous sign-in bridge for the prototype
+      // Simulate institutional OAuth via anonymous sign-in bridge
       await signInAnonymously(auth);
       const currentUid = auth.currentUser?.uid;
 
@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const isAdmin = ADMIN_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
       const isFaculty = FACULTY_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
 
-      // Default Role Assignment: Anyone with @neu.edu.ph is a STUDENT unless specified
+      // Default Role Assignment: Anyone with @neu.edu.ph is a STUDENT unless whitelisted
       let role: UserRole = 'STUDENT';
       let canEdit = false;
 
@@ -112,18 +112,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role = 'FACULTY';
         canEdit = true;
       }
-
-      // Cleanup duplicate records for the same email (IAM Clutter Prevention)
-      const q = query(collection(db, 'users'), where('email', '==', normalizedEmail));
-      const oldUsers = await getDocs(q);
-      const batch = writeBatch(db);
-      
-      oldUsers.forEach((oldDoc) => {
-        if (oldDoc.id !== currentUid) {
-          batch.delete(oldDoc.ref);
-          batch.delete(doc(db, 'roles_admin', oldDoc.id));
-        }
-      });
 
       // Generate Name from Email (e.g., juan.dela.cruz@neu.edu.ph -> Juan Dela Cruz)
       const nameParts = normalizedEmail.split('@')[0].split('.');
@@ -140,8 +128,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         canEdit: canEdit,
       };
 
-      // Atomic write for user profile and admin privileges
+      // Transactional write for user profile
+      const batch = writeBatch(db);
       batch.set(doc(db, 'users', currentUid), userData, { merge: true });
+      
+      // If the user is an admin, we must also record it in roles_admin for Firestore Rules
       if (role === 'ADMIN') {
         batch.set(doc(db, 'roles_admin', currentUid), { uid: currentUid, email: normalizedEmail }, { merge: true });
       }
@@ -163,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast({
         variant: "destructive",
         title: "System Error",
-        description: "Institutional verification failed. Please check your connection.",
+        description: "Institutional verification failed. Please try again.",
       });
     }
   };
