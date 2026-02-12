@@ -4,10 +4,11 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * NEU MOA Tracker - Security Rules v2.2
+     * NEU MOA Tracker - Security Rules v2.3
      * 
-     * FIXED: 
-     * - Admin bootstrap logic to recognize the primary administrator even across session UID changes.
+     * UPDATED for Prototype Testing:
+     * - Admin bootstrap relies on roles_admin document.
+     * - roles_admin creation is allowed for self-management during testing.
      */
 
     // --- Helper Functions ---
@@ -20,16 +21,8 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isPrimaryAdmin() {
-      // Allow the primary developer/admin email to bypass initial bootstrap hurdles
-      return request.auth.token.email == 'johnmarc.sanchez@neu.edu.ph';
-    }
-
     function isAdmin() {
-      return isSignedIn() && (
-        exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) ||
-        isPrimaryAdmin()
-      );
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
     function isNotBlocked() {
@@ -47,10 +40,9 @@ service cloud.firestore {
     }
 
     match /roles_admin/{userId} {
-      allow get: if isSignedIn();
+      allow get, create: if isOwner(userId);
       allow list: if isAdmin();
-      allow create: if isOwner(userId) || isPrimaryAdmin(); 
-      allow update, delete: if false; 
+      allow update, delete: if isAdmin(); 
     }
 
     match /memoranda_of_agreement/{moaId} {

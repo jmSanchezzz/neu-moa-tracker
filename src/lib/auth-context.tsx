@@ -23,6 +23,9 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Recognized Admin Emails
+const ADMIN_EMAILS = ['johnmarc.sanchez@neu.edu.ph', 'johnmarc@neu.edu.ph'];
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,23 +41,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (firebaseUser && storedEmail) {
         try {
-          const usersRef = collection(db, 'users');
-          const q = query(usersRef, where('email', '==', storedEmail));
-          const querySnapshot = await getDocs(q);
-
-          if (!querySnapshot.empty) {
-            const userData = querySnapshot.docs[0].data() as User;
-            
+          // Check for user document by UID first (the current session)
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as User;
             if (userData.isBlocked) {
               await signOut(auth);
               localStorage.removeItem('neu_moa_test_session');
               setUser(null);
             } else {
-              // Ensure the current UID is an admin if the email matches the primary admin
-              if (userData.role === 'ADMIN') {
-                await setDoc(doc(db, 'roles_admin', firebaseUser.uid), { uid: firebaseUser.uid, email: storedEmail }, { merge: true });
-              }
               setUser(userData);
+            }
+          } else {
+            // If doc doesn't exist by UID, try searching by email
+            const usersRef = collection(db, 'users');
+            const q = query(usersRef, where('email', '==', storedEmail));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+              const userData = querySnapshot.docs[0].data() as User;
+              // Link this UID to the existing email record
+              const updatedData = { ...userData, id: firebaseUser.uid };
+              await setDoc(doc(db, 'users', firebaseUser.uid), updatedData);
+              setUser(updatedData);
             }
           }
         } catch (e) {
@@ -85,6 +95,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!currentUid) throw new Error("Failed to initialize session.");
       
+      const isAdmin = ADMIN_EMAILS.includes(email);
+      const isFaculty = email === 'faculty@neu.edu.ph';
+      const isStudent = email === 'student@neu.edu.ph';
+
+      let role: UserRole = 'STUDENT';
+      let canEdit = false;
+
+      if (isAdmin) {
+        role = 'ADMIN';
+        canEdit = true;
+      } else if (isFaculty) {
+        role = 'FACULTY';
+        canEdit = true;
+      }
+
+      // Check for existing user by email
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('email', '==', email));
       const querySnapshot = await getDocs(q);
@@ -92,62 +118,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let userData: User;
 
       if (!querySnapshot.empty) {
-        const existingDoc = querySnapshot.docs[0];
-        userData = existingDoc.data() as User;
-        
-        // Sync role and permissions
-        let role: UserRole = userData.role;
-        let canEdit = userData.canEdit;
-
-        if (email === 'johnmarc.sanchez@neu.edu.ph') {
-          role = 'ADMIN';
-          canEdit = true;
-        } else if (email === 'faculty@neu.edu.ph') {
-          role = 'FACULTY';
-          canEdit = true;
-        } else if (email === 'student@neu.edu.ph') {
-          role = 'STUDENT';
-          canEdit = false;
-        }
-
-        // Always update the user document with the current session UID to keep things linked
-        const updatedUserData = { ...userData, id: currentUid, role, canEdit };
-        await setDoc(doc(db, 'users', currentUid), updatedUserData);
-        
-        // If the UID changed, we might want to delete the old record if it's different
-        if (existingDoc.id !== currentUid) {
-          // Note: In a production app we'd be more careful here, but for prototyping this keeps the session clean
-        }
-
-        if (role === 'ADMIN') {
-          await setDoc(doc(db, 'roles_admin', currentUid), { uid: currentUid, email }, { merge: true });
-        }
-
-        if (userData.isBlocked) {
-          toast({
-            variant: "destructive",
-            title: "Access Revoked",
-            description: "This account has been administratively blocked.",
-          });
-          await signOut(auth);
-          return;
-        }
-        userData = updatedUserData;
+        userData = querySnapshot.docs[0].data() as User;
+        // Overwrite role/canEdit for hardcoded test emails
+        userData = { 
+          ...userData, 
+          id: currentUid, 
+          role: isAdmin ? 'ADMIN' : (isFaculty ? 'FACULTY' : (isStudent ? 'STUDENT' : userData.role)),
+          canEdit: isAdmin ? true : (isFaculty ? true : (isStudent ? false : userData.canEdit))
+        };
       } else {
-        let role: UserRole = 'STUDENT';
-        let canEdit = false;
-
-        if (email === 'johnmarc.sanchez@neu.edu.ph') {
-          role = 'ADMIN';
-          canEdit = true;
-        } else if (email === 'faculty@neu.edu.ph') {
-          role = 'FACULTY';
-          canEdit = true;
-        } else if (email === 'student@neu.edu.ph') {
-          role = 'STUDENT';
-          canEdit = false;
-        }
-
         userData = {
           id: currentUid,
           name: email.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
@@ -156,21 +135,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           isBlocked: false,
           canEdit: canEdit,
         };
+      }
 
-        await setDoc(doc(db, 'users', currentUid), userData);
-        
-        if (role === 'ADMIN') {
-          await setDoc(doc(db, 'roles_admin', currentUid), { uid: currentUid, email });
-        }
-
+      if (userData.isBlocked) {
         toast({
-          title: "Profile Created",
-          description: `Logged in as ${role}.`,
+          variant: "destructive",
+          title: "Access Revoked",
+          description: "This account has been administratively blocked.",
         });
+        await signOut(auth);
+        return;
+      }
+
+      // Save user record
+      await setDoc(doc(db, 'users', currentUid), userData);
+      
+      // If Admin, sync roles_admin for Firestore security rules
+      if (userData.role === 'ADMIN') {
+        await setDoc(doc(db, 'roles_admin', currentUid), { uid: currentUid, email });
+      } else {
+        // Clean up old admin status if role changed
+        await deleteDoc(doc(db, 'roles_admin', currentUid)).catch(() => {});
       }
 
       localStorage.setItem('neu_moa_test_session', email);
       setUser(userData);
+      
+      toast({
+        title: "Access Granted",
+        description: `Logged in as ${userData.role}.`,
+      });
+
       router.push('/dashboard');
       
     } catch (error: any) {
