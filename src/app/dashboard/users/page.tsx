@@ -51,7 +51,7 @@ export default function UsersPage() {
     const newStatus = !user.isBlocked;
     updateDocumentNonBlocking(docRef, { isBlocked: newStatus });
     toast({
-      title: "User Blocked" : "User Restored",
+      title: newStatus ? "User Blocked" : "User Restored",
       description: `${user.name} access has been ${newStatus ? 'revoked' : 'granted'}.`,
     });
   };
