@@ -98,14 +98,14 @@ export function AddMoaDialog({ children }: { children?: React.ReactNode }) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {children || (
-          <Button className="bg-slate-900 text-white shadow-lg hover:bg-slate-800 transition-all font-semibold">
-            <PlusCircle className="mr-2 h-4 w-4 text-amber-500" /> Create Record
+          <Button className="bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all font-semibold">
+            <PlusCircle className="mr-2 h-4 w-4 text-accent" /> Create Record
           </Button>
         )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-slate-900">New Institutional Agreement</DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-primary">New Institutional Agreement</DialogTitle>
           <DialogDescription>
             Register a new Memorandum of Agreement into the NEU registry.
           </DialogDescription>
@@ -266,7 +266,7 @@ export function AddMoaDialog({ children }: { children?: React.ReactNode }) {
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-slate-900 text-amber-500 font-bold hover:bg-slate-800">
+              <Button type="submit" className="bg-primary text-accent font-bold hover:bg-primary/90">
                 Register MOA Record
               </Button>
             </div>

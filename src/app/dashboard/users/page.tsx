@@ -51,7 +51,7 @@ export default function UsersPage() {
     const newStatus = !user.isBlocked;
     updateDocumentNonBlocking(docRef, { isBlocked: newStatus });
     toast({
-      title: newStatus ? "User Blocked" : "User Restored",
+      title: "User Blocked" : "User Restored",
       description: `${user.name} access has been ${newStatus ? 'revoked' : 'granted'}.`,
     });
   };
@@ -69,7 +69,7 @@ export default function UsersPage() {
 
   const getRoleBadge = (role: string) => {
     switch (role) {
-      case 'ADMIN': return <Badge className="bg-slate-900 text-white border-slate-800">ADMIN</Badge>;
+      case 'ADMIN': return <Badge className="bg-primary text-white border-primary">ADMIN</Badge>;
       case 'FACULTY': return <Badge className="bg-amber-100 text-amber-800 border-amber-200">FACULTY</Badge>;
       case 'STUDENT': return <Badge variant="outline" className="border-slate-200 text-slate-500">STUDENT</Badge>;
       default: return <Badge variant="outline">{role}</Badge>;
@@ -80,7 +80,7 @@ export default function UsersPage() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-6">
         <div>
-          <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">IAM Management</h2>
+          <h2 className="text-3xl font-extrabold tracking-tight text-primary">IAM Management</h2>
           <p className="text-slate-500 mt-1 font-medium">
             Identity and Access Management control center for system users.
           </p>
@@ -94,13 +94,13 @@ export default function UsersPage() {
           </div>
         ) : (
           <Table>
-            <TableHeader className="bg-slate-900">
-              <TableRow className="hover:bg-transparent border-slate-800">
-                <TableHead className="text-slate-200 font-bold py-5">Institutional User</TableHead>
-                <TableHead className="text-slate-200 font-bold">System Role</TableHead>
-                <TableHead className="text-slate-200 font-bold">Access Status</TableHead>
-                <TableHead className="text-slate-200 font-bold">Elevated Edit Rights</TableHead>
-                <TableHead className="text-right text-slate-200 font-bold pr-6">Operations</TableHead>
+            <TableHeader className="bg-primary">
+              <TableRow className="hover:bg-transparent border-primary">
+                <TableHead className="text-white font-bold py-5">Institutional User</TableHead>
+                <TableHead className="text-white font-bold">System Role</TableHead>
+                <TableHead className="text-white font-bold">Access Status</TableHead>
+                <TableHead className="text-white font-bold">Elevated Edit Rights</TableHead>
+                <TableHead className="text-right text-white font-bold pr-6">Operations</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -144,7 +144,7 @@ export default function UsersPage() {
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="font-bold text-slate-600 hover:bg-slate-100"
+                        className="font-bold text-primary hover:bg-primary/10"
                         onClick={() => setEditingUser(u as any)}
                       >
                         <Edit2 className="h-3.5 w-3.5 mr-1.5" /> Edit

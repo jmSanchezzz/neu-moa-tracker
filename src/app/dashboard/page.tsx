@@ -147,7 +147,7 @@ export default function DashboardPage() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-6">
         <div>
-          <h2 className="text-3xl font-extrabold tracking-tight text-foreground">Admin Command Center</h2>
+          <h2 className="text-3xl font-extrabold tracking-tight text-primary">Admin Command Center</h2>
           <p className="text-muted-foreground mt-1 font-medium">
             Real-time institutional agreement monitoring and analytics.
           </p>
@@ -273,7 +273,7 @@ export default function DashboardPage() {
                           <Database className="h-8 w-8 text-muted-foreground" />
                         </div>
                         <div>
-                          <p className="text-foreground font-bold text-lg">No MOA records found.</p>
+                          <p className="text-primary font-bold text-lg">No MOA records found.</p>
                           <p className="text-muted-foreground text-sm max-w-md mx-auto">
                             The institutional database is currently empty. Use the <b>Create Record</b> button to add a new agreement.
                           </p>

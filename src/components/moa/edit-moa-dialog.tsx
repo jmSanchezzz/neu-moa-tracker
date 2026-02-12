@@ -115,7 +115,7 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-slate-900">Edit MOA Record</DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-primary">Edit MOA Record</DialogTitle>
           <DialogDescription>
             Modify institutional agreement details for {moa?.companyName}.
           </DialogDescription>
@@ -276,7 +276,7 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-slate-900 text-amber-500 font-bold hover:bg-slate-800">
+              <Button type="submit" className="bg-primary text-accent font-bold hover:bg-primary/90">
                 Update Record
               </Button>
             </div>

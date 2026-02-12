@@ -107,7 +107,7 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-slate-900">Modify User Access</DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-primary">Modify User Access</DialogTitle>
           <DialogDescription>
             Update role and permissions for {user?.email}.
           </DialogDescription>
@@ -180,7 +180,7 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-slate-900 text-amber-500 font-bold hover:bg-slate-800">
+              <Button type="submit" className="bg-primary text-accent font-bold hover:bg-primary/90">
                 Save Permissions
               </Button>
             </div>
