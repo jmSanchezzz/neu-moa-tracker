@@ -29,7 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useFirestore } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { doc, Timestamp } from "firebase/firestore";
 import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { useToast } from "@/hooks/use-toast";
 import { MOA } from "@/lib/mock-data";
@@ -42,8 +42,10 @@ const moaFormSchema = z.object({
   contactPersonEmail: z.string().email("Invalid email address"),
   industryType: z.string().min(2, "Industry type is required"),
   effectiveDate: z.string().min(1, "Effective date is required"),
+  expirationDate: z.string().min(1, "Expiration date is required"),
   college: z.string().min(1, "College endorsement is required"),
-  status: z.enum(["APPROVED", "PROCESSING", "EXPIRING", "EXPIRED"]),
+  primaryStatus: z.enum(["APPROVED", "PROCESSING", "EXPIRED"]),
+  subStatus: z.string().min(1, "Stage detail is required"),
 });
 
 type MoaFormValues = z.infer<typeof moaFormSchema>;
@@ -68,13 +70,21 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
       contactPersonEmail: "",
       industryType: "",
       effectiveDate: "",
+      expirationDate: "",
       college: "",
-      status: "PROCESSING",
+      primaryStatus: "PROCESSING",
+      subStatus: "AWAITING_HTE_SIGNATURE",
     },
   });
 
+  const pStatus = form.watch("primaryStatus");
+
   useEffect(() => {
     if (moa) {
+      const expDate = moa.expirationDate?.toDate 
+        ? moa.expirationDate.toDate().toISOString().split('T')[0] 
+        : new Date(moa.expirationDate).toISOString().split('T')[0];
+
       form.reset({
         hteId: moa.hteId,
         companyName: moa.companyName,
@@ -83,8 +93,10 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
         contactPersonEmail: moa.contactPersonEmail,
         industryType: moa.industryType,
         effectiveDate: moa.effectiveDate,
+        expirationDate: expDate,
         college: moa.college,
-        status: moa.status as any,
+        primaryStatus: moa.primaryStatus || "PROCESSING",
+        subStatus: moa.subStatus || "AWAITING_HTE_SIGNATURE",
       });
     }
   }, [moa, form]);
@@ -94,7 +106,13 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
     
     try {
       const docRef = doc(db, "memoranda_of_agreement", moa.id);
-      updateDocumentNonBlocking(docRef, values);
+      
+      const updateData = {
+        ...values,
+        expirationDate: Timestamp.fromDate(new Date(values.expirationDate)),
+      };
+      
+      updateDocumentNonBlocking(docRef, updateData);
       
       toast({
         title: "Record Updated",
@@ -125,34 +143,61 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="hteId"
+                name="primaryStatus"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="font-bold text-xs uppercase tracking-wider text-slate-500">HTE ID Reference</FormLabel>
-                    <FormControl>
-                      <Input placeholder="HTE-XXXX-202X" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-bold text-xs uppercase tracking-wider text-slate-500">Status</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} key={field.value}>
+                    <FormLabel className="font-bold text-xs uppercase tracking-wider text-slate-500">Primary Status</FormLabel>
+                    <Select onValueChange={(val) => {
+                      field.onChange(val);
+                      if (val === 'PROCESSING') form.setValue('subStatus', 'AWAITING_HTE_SIGNATURE');
+                      if (val === 'APPROVED') form.setValue('subStatus', 'SIGNED_BY_PRESIDENT');
+                      if (val === 'EXPIRED') form.setValue('subStatus', 'NO_RENEWAL_DONE');
+                    }} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select status" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="APPROVED">Approved</SelectItem>
                         <SelectItem value="PROCESSING">Processing</SelectItem>
-                        <SelectItem value="EXPIRING">Expiring</SelectItem>
+                        <SelectItem value="APPROVED">Approved</SelectItem>
                         <SelectItem value="EXPIRED">Expired</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="subStatus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="font-bold text-xs uppercase tracking-wider text-slate-500">Stage / Detail</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select detail" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {pStatus === 'PROCESSING' && (
+                          <>
+                            <SelectItem value="AWAITING_HTE_SIGNATURE">Awaiting HTE Signature</SelectItem>
+                            <SelectItem value="LEGAL_REVIEW">Legal Review</SelectItem>
+                            <SelectItem value="VPAA_APPROVAL">VPAA Approval</SelectItem>
+                          </>
+                        )}
+                        {pStatus === 'APPROVED' && (
+                          <>
+                            <SelectItem value="SIGNED_BY_PRESIDENT">Signed by President</SelectItem>
+                            <SelectItem value="ONGOING_NOTARIZATION">Ongoing Notarization</SelectItem>
+                            <SelectItem value="NO_NOTARIZATION_NEEDED">No Notarization Needed</SelectItem>
+                          </>
+                        )}
+                        {pStatus === 'EXPIRED' && (
+                          <SelectItem value="NO_RENEWAL_DONE">No Renewal Done</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -192,6 +237,35 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
+                name="hteId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="font-bold text-xs uppercase tracking-wider text-slate-500">HTE ID Reference</FormLabel>
+                    <FormControl>
+                      <Input placeholder="HTE-XXXX-202X" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="industryType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="font-bold text-xs uppercase tracking-wider text-slate-500">Industry Segment</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. Telecommunications" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
                 name="contactPerson"
                 render={({ field }) => (
                   <FormItem>
@@ -218,15 +292,28 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <FormField
                 control={form.control}
-                name="industryType"
+                name="effectiveDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="font-bold text-xs uppercase tracking-wider text-slate-500">Industry Segment</FormLabel>
+                    <FormLabel className="font-bold text-xs uppercase tracking-wider text-slate-500">Effective Date</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. Telecommunications" {...field} />
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="expirationDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="font-bold text-xs uppercase tracking-wider text-slate-500">Expiration Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -237,8 +324,8 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
                 name="college"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="font-bold text-xs uppercase tracking-wider text-slate-500">Endorsing College</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} key={field.value}>
+                    <FormLabel className="font-bold text-xs uppercase tracking-wider text-slate-500">College</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select college" />
@@ -257,20 +344,6 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="effectiveDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-bold text-xs uppercase tracking-wider text-slate-500">Effective Date</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <div className="flex justify-end gap-3 pt-6 border-t">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
