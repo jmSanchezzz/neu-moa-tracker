@@ -82,11 +82,12 @@ export function MoaTable({ data, role, canEdit }: MoaTableProps) {
       case 'EXPIRED':
         return <Badge className="bg-red-100 text-red-800 border-red-200">Expired</Badge>;
       default:
-        return <Badge variant="outline">{moa.primaryStatus}</Badge>;
+        return <Badge variant="outline">{moa.primaryStatus || "No Status"}</Badge>;
     }
   };
 
-  const formatSubStatus = (sub: string) => {
+  const formatSubStatus = (sub: string | undefined | null) => {
+    if (!sub) return "Pending Stage";
     return sub.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
   };
 

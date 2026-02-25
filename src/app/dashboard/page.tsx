@@ -35,7 +35,7 @@ import {
   Database
 } from "lucide-react";
 import { useCollection, useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError } from "@/firebase";
-import { collection, query, orderBy, doc, writeBatch } from "firebase/firestore";
+import { collection, query, orderBy, doc, writeBatch, Timestamp } from "firebase/firestore";
 import { AddMoaDialog } from "@/components/moa/add-moa-dialog";
 import { MOCK_MOAS } from "@/lib/mock-data";
 import { useToast } from "@/hooks/use-toast";
@@ -89,7 +89,7 @@ export default function DashboardPage() {
 
       const matchesCollege = collegeFilter === "all" || moa.college === collegeFilter;
       const matchesIndustry = industryFilter === "all" || moa.industryType === industryFilter;
-      const matchesStatus = statusFilter === "all" || moa.status === statusFilter;
+      const matchesStatus = statusFilter === "all" || moa.primaryStatus === statusFilter;
 
       return matchesSearch && matchesCollege && matchesIndustry && matchesStatus;
     });
@@ -103,7 +103,11 @@ export default function DashboardPage() {
       const batch = writeBatch(db);
       MOCK_MOAS.forEach((moa) => {
         const docRef = doc(collection(db, "memoranda_of_agreement"));
-        batch.set(docRef, { ...moa, id: docRef.id });
+        batch.set(docRef, { 
+          ...moa, 
+          id: docRef.id,
+          expirationDate: Timestamp.fromDate(new Date(moa.expirationDate))
+        });
       });
       
       await batch.commit();
@@ -122,29 +126,40 @@ export default function DashboardPage() {
       toast({
         variant: "destructive",
         title: "Seeding Failed",
-        description: "Institutional registry write access denied. Please re-login.",
+        description: "Insufficient permissions or sync error. Please refresh.",
       });
     } finally {
       setIsSeeding(false);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const isExpiring = (moa: any) => {
+    if (moa.primaryStatus !== 'APPROVED') return false;
+    const expDate = moa.expirationDate?.toDate ? moa.expirationDate.toDate() : new Date(moa.expirationDate);
+    const now = new Date();
+    const diffTime = expDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 && diffDays <= 60;
+  };
+
+  const getStatusBadge = (moa: any) => {
+    if (isExpiring(moa)) {
+      return (
+        <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200 px-3 py-1 font-semibold rounded-full flex items-center gap-1">
+          <AlertCircle className="h-3 w-3" /> Expiring
+        </Badge>
+      );
+    }
+
+    switch (moa.primaryStatus) {
       case 'APPROVED': 
         return <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200 px-3 py-1 font-semibold rounded-full">Approved</Badge>;
       case 'PROCESSING': 
         return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200 px-3 py-1 font-semibold rounded-full">Processing</Badge>;
-      case 'EXPIRING': 
-        return (
-          <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200 px-3 py-1 font-semibold rounded-full flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" /> Expiring
-          </Badge>
-        );
       case 'EXPIRED': 
         return <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-red-200 px-3 py-1 font-semibold rounded-full">Expired</Badge>;
       default: 
-        return <Badge variant="outline" className="px-3 py-1 rounded-full">{status}</Badge>;
+        return <Badge variant="outline" className="px-3 py-1 rounded-full">{moa.primaryStatus || "No Status"}</Badge>;
     }
   };
 
@@ -228,7 +243,6 @@ export default function DashboardPage() {
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="APPROVED">Approved</SelectItem>
                 <SelectItem value="PROCESSING">Processing</SelectItem>
-                <SelectItem value="EXPIRING">Expiring</SelectItem>
                 <SelectItem value="EXPIRED">Expired</SelectItem>
               </SelectContent>
             </Select>
@@ -318,7 +332,7 @@ export default function DashboardPage() {
                         {moa.college}
                       </TableCell>
                       <TableCell>
-                        {getStatusBadge(moa.status)}
+                        {getStatusBadge(moa)}
                       </TableCell>
                       <TableCell className="text-right pr-6">
                         <div className="flex justify-end gap-1">
