@@ -1,0 +1,14 @@
+
+{
+  "indexes": [
+    {
+      "collectionGroup": "memoranda_of_agreement",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "primaryStatus", "order": "ASCENDING" },
+        { "fieldPath": "expirationDate", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

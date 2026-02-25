@@ -3,57 +3,63 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * NEU MOA Tracker - Security Rules v2.5
-     * 
-     * Refined for Anonymous Institutional Testing:
-     * - Allows owners to manage their own admin status for bootstrap.
-     * - Simplified role checks for prototype stability.
-     */
-
     // --- Helper Functions ---
 
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
     function isAdmin() {
       return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
+    function isAuthorizedFaculty() {
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return isSignedIn() && exists(userPath) && 
+             get(userPath).data.role == 'FACULTY' && 
+             get(userPath).data.canEdit == true;
+    }
+
     function isNotBlocked() {
       let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      // If user doc doesn't exist yet (initial login), they are not blocked.
       return !exists(userPath) || get(userPath).data.isBlocked == false;
+    }
+
+    function validateStatus(data) {
+      let pStatus = data.primaryStatus;
+      let sStatus = data.subStatus;
+      
+      return (pStatus == 'PROCESSING' && sStatus in ['AWAITING_HTE_SIGNATURE', 'LEGAL_REVIEW', 'VPAA_APPROVAL']) ||
+             (pStatus == 'APPROVED' && sStatus in ['SIGNED_BY_PRESIDENT', 'ONGOING_NOTARIZATION', 'NO_NOTARIZATION_NEEDED']) ||
+             (pStatus == 'EXPIRED' && sStatus in ['NO_RENEWAL_DONE']);
     }
 
     // --- Collection Rules ---
 
     match /users/{userId} {
-      // Allow users to read profiles and create their own
       allow get, list: if isSignedIn(); 
-      allow create, update: if isOwner(userId) || isAdmin();
+      allow create, update: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
       allow delete: if isAdmin();
     }
 
     match /roles_admin/{userId} {
-      // Allow user to create/update their own admin record during bootstrap
-      allow get, create, update: if isOwner(userId);
-      // Standard admin management
+      allow get: if isSignedIn() && request.auth.uid == userId;
+      allow create, update: if isSignedIn() && request.auth.uid == userId;
       allow list, delete: if isAdmin(); 
     }
 
     match /memoranda_of_agreement/{moaId} {
-      allow get, list: if isSignedIn() && isNotBlocked();
-      allow create, update, delete: if isAdmin();
+      allow read: if isSignedIn() && isNotBlocked();
+      
+      allow create, update: if (isAdmin() || isAuthorizedFaculty()) && 
+                             validateStatus(request.resource.data) &&
+                             request.resource.data.expirationDate is timestamp;
+      
+      allow delete: if isAdmin();
     }
 
     match /audit_logs/{auditLogId} {
-      allow get, list, create, update, delete: if isAdmin();
+      allow read, write: if isAdmin();
     }
   }
 }

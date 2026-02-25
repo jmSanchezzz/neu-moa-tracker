@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -19,7 +20,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Edit, Trash, RotateCcw, Eye } from "lucide-react";
+import { MoreVertical, Edit, Trash, RotateCcw, Eye, AlertCircle } from "lucide-react";
 import { EditMoaDialog } from "./edit-moa-dialog";
 import { ViewMoaDialog } from "./view-moa-dialog";
 import { useFirestore } from "@/firebase";
@@ -53,29 +54,40 @@ export function MoaTable({ data, role, canEdit }: MoaTableProps) {
     });
   };
 
-  const handleRecover = (moa: MOA) => {
-    if (!db) return;
-    const docRef = doc(db, "memoranda_of_agreement", moa.id);
-    updateDocumentNonBlocking(docRef, { isDeleted: false });
-    toast({
-      title: "Record Restored",
-      description: `${moa.companyName} is now active again.`,
-    });
+  const isExpiring = (moa: MOA) => {
+    if (moa.primaryStatus !== 'APPROVED') return false;
+    const expDate = moa.expirationDate?.toDate ? moa.expirationDate.toDate() : new Date(moa.expirationDate);
+    const now = new Date();
+    const diffTime = expDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 && diffDays <= 60;
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const getStatusBadge = (moa: MOA) => {
+    const expiring = isExpiring(moa);
+    
+    if (expiring) {
+      return (
+        <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200 px-3 py-1 font-semibold rounded-full flex items-center gap-1">
+          <AlertCircle className="h-3 w-3" /> Expiring Soon
+        </Badge>
+      );
+    }
+
+    switch (moa.primaryStatus) {
       case 'APPROVED':
         return <Badge className="bg-green-100 text-green-800 border-green-200">Approved</Badge>;
       case 'PROCESSING':
         return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Processing</Badge>;
-      case 'EXPIRING':
-        return <Badge className="bg-amber-100 text-amber-800 border-amber-200">Expiring</Badge>;
       case 'EXPIRED':
         return <Badge className="bg-red-100 text-red-800 border-red-200">Expired</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="outline">{moa.primaryStatus}</Badge>;
     }
+  };
+
+  const formatSubStatus = (sub: string) => {
+    return sub.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
   };
 
   return (
@@ -85,16 +97,12 @@ export function MoaTable({ data, role, canEdit }: MoaTableProps) {
           <TableRow>
             {!isStudent && <TableHead>HTE ID</TableHead>}
             <TableHead>Company Name</TableHead>
-            <TableHead>Address</TableHead>
-            <TableHead>Contact Person</TableHead>
-            <TableHead>Email</TableHead>
+            <TableHead>Primary Status</TableHead>
+            <TableHead>Stage / Detail</TableHead>
             {!isStudent && (
               <>
-                <TableHead>Industry</TableHead>
                 <TableHead>College</TableHead>
-                <TableHead>Effective Date</TableHead>
-                <TableHead>Status</TableHead>
-                {isAdmin && <TableHead>Deleted</TableHead>}
+                <TableHead>Expiration</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </>
             )}
@@ -112,24 +120,16 @@ export function MoaTable({ data, role, canEdit }: MoaTableProps) {
               <TableRow key={moa.id} className={moa.isDeleted ? "opacity-50 grayscale bg-muted/20" : ""}>
                 {!isStudent && <TableCell className="font-mono text-xs">{moa.hteId}</TableCell>}
                 <TableCell className="font-medium">{moa.companyName}</TableCell>
-                <TableCell className="max-w-[200px] truncate">{moa.companyAddress}</TableCell>
-                <TableCell>{moa.contactPerson}</TableCell>
-                <TableCell>{moa.contactPersonEmail}</TableCell>
+                <TableCell>{getStatusBadge(moa)}</TableCell>
+                <TableCell>
+                  <span className="text-xs font-medium text-slate-500">{formatSubStatus(moa.subStatus)}</span>
+                </TableCell>
                 {!isStudent && (
                   <>
-                    <TableCell>{moa.industryType}</TableCell>
                     <TableCell>{moa.college}</TableCell>
-                    <TableCell>{moa.effectiveDate}</TableCell>
-                    <TableCell>{getStatusBadge(moa.status)}</TableCell>
-                    {isAdmin && (
-                      <TableCell>
-                        {moa.isDeleted ? (
-                          <Badge variant="destructive">Yes</Badge>
-                        ) : (
-                          <Badge variant="secondary" className="bg-slate-100">No</Badge>
-                        )}
-                      </TableCell>
-                    )}
+                    <TableCell className="text-xs">
+                      {moa.expirationDate?.toDate ? moa.expirationDate.toDate().toLocaleDateString() : new Date(moa.expirationDate).toLocaleDateString()}
+                    </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -153,15 +153,6 @@ export function MoaTable({ data, role, canEdit }: MoaTableProps) {
                                 onClick={() => handleSoftDelete(moa)}
                               >
                                 <Trash className="mr-2 h-4 w-4" /> Soft Delete
-                              </DropdownMenuItem>
-                            </>
-                          )}
-
-                          {isAdmin && moa.isDeleted && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleRecover(moa)}>
-                                <RotateCcw className="mr-2 h-4 w-4" /> Recover
                               </DropdownMenuItem>
                             </>
                           )}
