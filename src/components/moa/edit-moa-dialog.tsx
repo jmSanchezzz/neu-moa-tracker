@@ -81,20 +81,32 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
 
   useEffect(() => {
     if (moa) {
-      const expDate = moa.expirationDate?.toDate 
-        ? moa.expirationDate.toDate().toISOString().split('T')[0] 
-        : new Date(moa.expirationDate).toISOString().split('T')[0];
+      // Safe Date Conversion Utility
+      let expDateStr = "";
+      if (moa.expirationDate) {
+        try {
+          const dateObj = moa.expirationDate.toDate 
+            ? moa.expirationDate.toDate() 
+            : new Date(moa.expirationDate);
+          
+          if (!isNaN(dateObj.getTime())) {
+            expDateStr = dateObj.toISOString().split('T')[0];
+          }
+        } catch (e) {
+          expDateStr = "";
+        }
+      }
 
       form.reset({
-        hteId: moa.hteId,
-        companyName: moa.companyName,
-        companyAddress: moa.companyAddress,
-        contactPerson: moa.contactPerson,
-        contactPersonEmail: moa.contactPersonEmail,
-        industryType: moa.industryType,
-        effectiveDate: moa.effectiveDate,
-        expirationDate: expDate,
-        college: moa.college,
+        hteId: moa.hteId || "",
+        companyName: moa.companyName || "",
+        companyAddress: moa.companyAddress || "",
+        contactPerson: moa.contactPerson || "",
+        contactPersonEmail: moa.contactPersonEmail || "",
+        industryType: moa.industryType || "",
+        effectiveDate: moa.effectiveDate || "",
+        expirationDate: expDateStr,
+        college: moa.college || "",
         primaryStatus: moa.primaryStatus || "PROCESSING",
         subStatus: moa.subStatus || "AWAITING_HTE_SIGNATURE",
       });

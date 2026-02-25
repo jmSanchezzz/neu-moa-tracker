@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MOA } from "@/lib/mock-data";
-import { CheckCircle2, Clock, AlertTriangle, XCircle, ArrowUpRight, TrendingUp, TrendingDown, Users } from "lucide-react";
+import { CheckCircle2, Clock, AlertTriangle, Users, ArrowUpRight, TrendingUp, TrendingDown } from "lucide-react";
 import Link from "next/link";
 
 type MoaStatsProps = {
@@ -10,9 +10,30 @@ type MoaStatsProps = {
 };
 
 export function MoaStats({ moas }: MoaStatsProps) {
-  const activeCount = moas.filter(m => m.status === 'APPROVED' && !m.isDeleted).length;
-  const processingCount = moas.filter(m => m.status === 'PROCESSING' && !m.isDeleted).length;
-  const expiringCount = moas.filter(m => m.status === 'EXPIRING' && !m.isDeleted).length;
+  // Expiring logic: APPROVED and within 60 days
+  const isExpiring = (moa: any) => {
+    if (moa.primaryStatus !== 'APPROVED') return false;
+    try {
+      const expDate = moa.expirationDate?.toDate 
+        ? moa.expirationDate.toDate() 
+        : new Date(moa.expirationDate);
+      
+      if (isNaN(expDate.getTime())) return false;
+      
+      const now = new Date();
+      const diffTime = expDate.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Expiring if within 60 days but not yet passed
+      return diffDays > 0 && diffDays <= 60;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const activeCount = moas.filter(m => m.primaryStatus === 'APPROVED' && !m.isDeleted).length;
+  const processingCount = moas.filter(m => m.primaryStatus === 'PROCESSING' && !m.isDeleted).length;
+  const expiringCount = moas.filter(m => isExpiring(m) && !m.isDeleted).length;
   const totalCount = moas.length;
 
   const stats = [
@@ -44,7 +65,7 @@ export function MoaStats({ moas }: MoaStatsProps) {
       bgColor: "bg-amber-50",
       trend: "+12.1%",
       isPositive: true,
-      link: "/dashboard/moas?status=EXPIRING"
+      link: "/dashboard/moas"
     },
     {
       title: "Total Partners",
@@ -61,10 +82,10 @@ export function MoaStats({ moas }: MoaStatsProps) {
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat) => (
-        <Card key={stat.title} className="relative overflow-hidden border border-slate-200 shadow-md group hover:border-amber-400/50 transition-all duration-300">
+        <Card key={stat.title} className="relative overflow-hidden border border-slate-200 shadow-md group hover:border-accent/50 transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-black text-slate-500 uppercase tracking-[0.15em]">{stat.title}</CardTitle>
-            <Link href={stat.link} className="text-slate-300 group-hover:text-amber-500 transition-colors">
+            <Link href={stat.link} className="text-slate-300 group-hover:text-accent transition-colors">
               <ArrowUpRight className="h-4 w-4" />
             </Link>
           </CardHeader>
@@ -85,7 +106,7 @@ export function MoaStats({ moas }: MoaStatsProps) {
               </div>
             </div>
           </CardContent>
-          <div className="absolute bottom-0 left-0 h-1 w-full bg-slate-100 group-hover:bg-amber-400 transition-colors" />
+          <div className="absolute bottom-0 left-0 h-1 w-full bg-slate-100 group-hover:bg-accent transition-colors" />
         </Card>
       ))}
     </div>
