@@ -32,7 +32,7 @@ import {
 import { useFirestore } from "@/firebase";
 import { doc, Timestamp, writeBatch, collection } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { MOA } from "@/lib/mock-data";
+import { MOA, NEU_COLLEGES } from "@/lib/mock-data";
 import { useAuth } from "@/lib/auth-context";
 
 const moaFormSchema = z.object({
@@ -166,7 +166,10 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto" onCloseAutoFocus={(e) => {
+        e.preventDefault();
+        document.body.style.pointerEvents = '';
+      }}>
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-primary">Edit MOA Record</DialogTitle>
           <DialogDescription>
@@ -367,11 +370,7 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="College of Computer Studies">College of Computer Studies</SelectItem>
-                        <SelectItem value="College of Engineering">College of Engineering</SelectItem>
-                        <SelectItem value="College of Business Administration">College of Business Administration</SelectItem>
-                        <SelectItem value="College of Hospitality Management">College of Hospitality Management</SelectItem>
-                        <SelectItem value="College of Arts and Sciences">College of Arts and Sciences</SelectItem>
+                        {NEU_COLLEGES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <FormMessage />

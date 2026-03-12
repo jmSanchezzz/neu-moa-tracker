@@ -20,10 +20,20 @@ service cloud.firestore {
              get(userPath).data.canEdit == true;
     }
 
+    // Prototype accounts sign in anonymously. Firebase reports sign_in_provider as
+    // either 'anonymous' (standard) or 'custom' (emulator / App Hosting environments).
+    function isPrototypeUser() {
+      return isSignedIn() && (
+        request.auth.token.firebase.sign_in_provider == 'anonymous' ||
+        request.auth.token.firebase.sign_in_provider == 'custom'
+      );
+    }
+
     function isNotBlocked() {
+      // Prototype (anonymous) users skip the cross-document check — they are
+      // app-controlled and an isBlocked flag on them has no meaning in this flow.
       let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      // Allow if user record doesn't exist yet (initial login) or is explicitly not blocked
-      return !exists(userPath) || get(userPath).data.isBlocked == false;
+      return isPrototypeUser() || !exists(userPath) || get(userPath).data.isBlocked != true;
     }
 
     function validateStatus(data) {

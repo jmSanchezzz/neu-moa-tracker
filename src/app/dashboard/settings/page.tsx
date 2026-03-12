@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,20 +17,14 @@ import {
   History, 
   Bell, 
   FileLock,
-  Loader2,
   Save
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { useFirestore } from "@/firebase";
-import { collection, doc, writeBatch, Timestamp } from "firebase/firestore";
-import { MOCK_MOAS } from "@/lib/mock-data";
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const router = useRouter();
   const db = useFirestore();
-  const { toast } = useToast();
-  const [isSeeding, setIsSeeding] = useState(false);
 
   useEffect(() => {
     if (user && user.role !== 'ADMIN') {
@@ -39,57 +33,6 @@ export default function SettingsPage() {
   }, [user, router]);
 
   if (!user || user.role !== 'ADMIN') return null;
-
-  const handleSeed = async () => {
-    if (!db || isSeeding) return;
-    setIsSeeding(true);
-    
-    try {
-      const batch = writeBatch(db);
-      MOCK_MOAS.forEach((moa) => {
-        const docRef = doc(collection(db, "memoranda_of_agreement"));
-        
-        // Ensure 2-year validity
-        const effDate = new Date(moa.effectiveDate);
-        const expDate = new Date(effDate);
-        expDate.setFullYear(expDate.getFullYear() + 2);
-
-        batch.set(docRef, { 
-          ...moa, 
-          id: docRef.id,
-          effectiveDate: moa.effectiveDate,
-          expirationDate: Timestamp.fromDate(expDate),
-          isDeleted: false
-        });
-
-        // Log the seeding action
-        const logRef = doc(collection(db, "audit_logs"));
-        batch.set(logRef, {
-          userId: user.id,
-          userName: user.name,
-          operation: 'INSERT',
-          moaId: docRef.id,
-          timestamp: Timestamp.now(),
-          details: `Seeded ${moa.companyName} via System Control Panel.`
-        });
-      });
-      
-      await batch.commit();
-      
-      toast({
-        title: "System Synchronized",
-        description: "Institutional records and audit trails have been populated.",
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Seeding Failed",
-        description: "Insufficient permissions to modify institutional registry.",
-      });
-    } finally {
-      setIsSeeding(false);
-    }
-  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -143,23 +86,6 @@ export default function SettingsPage() {
               <div className="flex gap-2">
                 <Input defaultValue="2" type="number" className="max-w-[100px]" />
                 <Button variant="outline" className="font-bold">Set Default</Button>
-              </div>
-            </div>
-            <Separator />
-            <div className="space-y-4">
-              <Label className="font-bold">Institutional Data Tools</Label>
-              <div className="flex flex-col gap-2">
-                <Button 
-                  onClick={handleSeed} 
-                  disabled={isSeeding}
-                  className="bg-accent text-accent-foreground font-bold w-full hover:bg-accent/90"
-                >
-                  {isSeeding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Database className="h-4 w-4 mr-2" />}
-                  Seed Institutional Records
-                </Button>
-                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest text-center">
-                  Populates 20 sample MOAs and audit logs.
-                </p>
               </div>
             </div>
           </CardContent>

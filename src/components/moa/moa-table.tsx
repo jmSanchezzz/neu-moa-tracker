@@ -80,6 +80,40 @@ export function MoaTable({ data, role, canEdit }: MoaTableProps) {
     }
   };
 
+  const handleRestore = async (moa: MOA) => {
+    if (!db || !user) return;
+    
+    try {
+      const batch = writeBatch(db);
+      const docRef = doc(db, "memoranda_of_agreement", moa.id);
+      
+      batch.update(docRef, { isDeleted: false });
+
+      const logRef = doc(collection(db, "audit_logs"));
+      batch.set(logRef, {
+        userId: user.id,
+        userName: user.name,
+        operation: 'RESTORE',
+        moaId: moa.id,
+        timestamp: Timestamp.now(),
+        details: `Restored institutional record for ${moa.companyName}.`
+      });
+      
+      await batch.commit();
+      
+      toast({
+        title: "Record Restored",
+        description: `${moa.companyName} has been restored from archive.`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to restore record.",
+      });
+    }
+  };
+
   const isExpiring = (moa: MOA) => {
     if (moa.primaryStatus !== 'APPROVED') return false;
     const expDate = moa.expirationDate?.toDate ? moa.expirationDate.toDate() : new Date(moa.expirationDate);
@@ -122,12 +156,19 @@ export function MoaTable({ data, role, canEdit }: MoaTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            {!isStudent && <TableHead>HTE ID</TableHead>}
-            <TableHead>Company Name</TableHead>
-            <TableHead>Primary Status</TableHead>
-            <TableHead>Stage / Detail</TableHead>
-            {!isStudent && (
+            {isStudent ? (
               <>
+                <TableHead>Company Name</TableHead>
+                <TableHead>Company Address</TableHead>
+                <TableHead>Contact Person</TableHead>
+                <TableHead>Contact Email</TableHead>
+              </>
+            ) : (
+              <>
+                <TableHead>HTE ID</TableHead>
+                <TableHead>Company Name</TableHead>
+                <TableHead>Primary Status</TableHead>
+                <TableHead>Stage / Detail</TableHead>
                 <TableHead>College</TableHead>
                 <TableHead>Expiration</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -145,14 +186,22 @@ export function MoaTable({ data, role, canEdit }: MoaTableProps) {
           ) : (
             data.map((moa) => (
               <TableRow key={moa.id} className={moa.isDeleted ? "opacity-50 grayscale bg-muted/20" : ""}>
-                {!isStudent && <TableCell className="font-mono text-xs">{moa.hteId}</TableCell>}
-                <TableCell className="font-medium">{moa.companyName}</TableCell>
-                <TableCell>{getStatusBadge(moa)}</TableCell>
-                <TableCell>
-                  <span className="text-xs font-medium text-slate-500">{formatSubStatus(moa.subStatus)}</span>
-                </TableCell>
-                {!isStudent && (
+                {isStudent ? (
                   <>
+                    <TableCell className="font-medium">{moa.companyName}</TableCell>
+                    <TableCell className="text-sm text-slate-600">{moa.companyAddress}</TableCell>
+                    <TableCell className="text-sm">{moa.contactPerson}</TableCell>
+                    <TableCell className="text-sm text-slate-600">{moa.contactPersonEmail}</TableCell>
+
+                  </>
+                ) : (
+                  <>
+                    <TableCell className="font-mono text-xs">{moa.hteId}</TableCell>
+                    <TableCell className="font-medium">{moa.companyName}</TableCell>
+                    <TableCell>{getStatusBadge(moa)}</TableCell>
+                    <TableCell>
+                      <span className="text-xs font-medium text-slate-500">{formatSubStatus(moa.subStatus)}</span>
+                    </TableCell>
                     <TableCell>{moa.college}</TableCell>
                     <TableCell className="text-xs">
                       {moa.expirationDate?.toDate ? moa.expirationDate.toDate().toLocaleDateString() : new Date(moa.expirationDate).toLocaleDateString()}
@@ -165,14 +214,14 @@ export function MoaTable({ data, role, canEdit }: MoaTableProps) {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setViewingMoa(moa)}>
+                          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTimeout(() => setViewingMoa(moa), 0); }}>
                             <Eye className="mr-2 h-4 w-4" /> View Details
                           </DropdownMenuItem>
                           
                           {((isAdmin) || (isFaculty && canEdit)) && !moa.isDeleted && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => setEditingMoa(moa)}>
+                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTimeout(() => setEditingMoa(moa), 0); }}>
                                 <Edit className="mr-2 h-4 w-4" /> Edit
                               </DropdownMenuItem>
                               <DropdownMenuItem 
@@ -180,6 +229,15 @@ export function MoaTable({ data, role, canEdit }: MoaTableProps) {
                                 onClick={() => handleSoftDelete(moa)}
                               >
                                 <Trash className="mr-2 h-4 w-4" /> Soft Delete
+                              </DropdownMenuItem>
+                            </>
+                          )}
+
+                          {((isAdmin) || (isFaculty && canEdit)) && moa.isDeleted && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleRestore(moa)}>
+                                <RotateCcw className="mr-2 h-4 w-4" /> Restore
                               </DropdownMenuItem>
                             </>
                           )}

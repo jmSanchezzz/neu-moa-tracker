@@ -25,6 +25,29 @@ export type MOA = {
   isDeleted: boolean;
 };
 
+export const NEU_COLLEGES = [
+  'College of Accountancy',
+  'College of Agriculture',
+  'College of Architecture',
+  'College of Arts and Sciences',
+  'College of Business Administration',
+  'College of Communication',
+  'College of Criminology',
+  'College of Education',
+  'College of Engineering and Technology',
+  'College of Informatics and Computing Studies',
+  'College of Law',
+  'College of Medical Technology',
+  'College of Medicine',
+  'College of Midwifery',
+  'College of Music',
+  'College of Nursing',
+  'College of Physical Therapy',
+  'College of Respiratory Therapy',
+  'School of International Relations',
+  'School of Graduate Studies',
+] as const;
+
 export type UserRole = 'ADMIN' | 'FACULTY' | 'STUDENT';
 
 export type User = {

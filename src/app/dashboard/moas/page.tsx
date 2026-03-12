@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { MoaTable } from "@/components/moa/moa-table";
 import { SearchSection } from "@/components/moa/search-section";
@@ -14,17 +15,24 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Loader2, CalendarClock } from "lucide-react";
+import { PlusCircle, Loader2, CalendarClock, Archive } from "lucide-react";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy, where, Timestamp } from "firebase/firestore";
 import { AddMoaDialog } from "@/components/moa/add-moa-dialog";
+import { NEU_COLLEGES } from "@/lib/mock-data";
 
 export default function MoasPage() {
   const { user } = useAuth();
   const db = useFirestore();
+  const searchParams = useSearchParams();
+  const isArchiveView = searchParams.get('filter') === 'deleted';
+  const statusParam = searchParams.get('status');
   const [searchQuery, setSearchQuery] = useState("");
   const [collegeFilter, setCollegeFilter] = useState("all");
-  const [showOnlyExpiring, setShowOnlyExpiring] = useState(false);
+  const [statusFilter, setStatusFilter] = useState(
+    statusParam && statusParam !== 'EXPIRING' ? statusParam : 'all'
+  );
+  const [showOnlyExpiring, setShowOnlyExpiring] = useState(statusParam === 'EXPIRING');
 
   // Time-based Expiring Query Logic for Deliverable
   const expiringQuery = useMemoFirebase(() => {
@@ -56,11 +64,25 @@ export default function MoasPage() {
   const isAdmin = user.role === 'ADMIN';
   const isFaculty = user.role === 'FACULTY';
   
-  const colleges = Array.from(new Set(moas?.map(m => m.college) || []));
+  const colleges = NEU_COLLEGES;
+
+  const isStudent = user.role === 'STUDENT';
 
   const filteredData = useMemo(() => {
     if (!moas) return [];
     return moas.filter(moa => {
+      if (isStudent && moa.primaryStatus !== 'APPROVED') return false;
+
+      // Archive view: only deleted; Normal view: exclude deleted
+      if (isArchiveView) {
+        if (!moa.isDeleted) return false;
+      } else {
+        if (moa.isDeleted) return false;
+      }
+
+      // Status filter from dropdown
+      if (statusFilter !== 'all' && moa.primaryStatus !== statusFilter) return false;
+
       const matchesSearch = 
         moa.companyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         moa.hteId.toLowerCase().includes(searchQuery.toLowerCase());
@@ -68,25 +90,33 @@ export default function MoasPage() {
       const matchesCollege = collegeFilter === "all" || moa.college === collegeFilter;
       return matchesSearch && matchesCollege;
     });
-  }, [moas, searchQuery, collegeFilter]);
+  }, [moas, searchQuery, collegeFilter, statusFilter, isStudent, isArchiveView]);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-primary">MOA Records</h2>
-          <p className="text-muted-foreground">Search and manage institutional agreements.</p>
+          <h2 className="text-3xl font-bold tracking-tight text-primary">
+            {isArchiveView ? (
+              <span className="flex items-center gap-2"><Archive className="h-7 w-7" /> Archived / Trash</span>
+            ) : "MOA Records"}
+          </h2>
+          <p className="text-muted-foreground">
+            {isArchiveView ? "Archived records that have been soft-deleted." : "Search and manage institutional agreements."}
+          </p>
         </div>
         <div className="flex gap-2">
-          <Button 
-            variant={showOnlyExpiring ? "default" : "outline"} 
-            className={showOnlyExpiring ? "bg-amber-600 hover:bg-amber-700" : ""}
-            onClick={() => setShowOnlyExpiring(!showOnlyExpiring)}
-          >
-            <CalendarClock className="mr-2 h-4 w-4" />
-            {showOnlyExpiring ? "Showing Expiring" : "View Expiring (60 Days)"}
-          </Button>
-          {(isAdmin || (isFaculty && user.canEdit)) && (
+          {!isStudent && !isArchiveView && (
+            <Button 
+              variant={showOnlyExpiring ? "default" : "outline"} 
+              className={showOnlyExpiring ? "bg-amber-600 hover:bg-amber-700" : ""}
+              onClick={() => setShowOnlyExpiring(!showOnlyExpiring)}
+            >
+              <CalendarClock className="mr-2 h-4 w-4" />
+              {showOnlyExpiring ? "Showing Expiring" : "View Expiring (60 Days)"}
+            </Button>
+          )}
+          {!isArchiveView && (isAdmin || (isFaculty && user.canEdit)) && (
             <AddMoaDialog>
               <Button className="bg-primary"><PlusCircle className="mr-2 h-4 w-4" /> Add New MOA</Button>
             </AddMoaDialog>
@@ -107,6 +137,20 @@ export default function MoasPage() {
               </SelectContent>
             </Select>
           </div>
+          {!isStudent && (
+            <div className="space-y-2">
+              <Label>Filter by Status</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="APPROVED">Approved</SelectItem>
+                  <SelectItem value="PROCESSING">Processing</SelectItem>
+                  <SelectItem value="EXPIRED">Expired</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       </div>
 

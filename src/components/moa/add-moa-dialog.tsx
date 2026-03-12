@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { NEU_COLLEGES } from "@/lib/mock-data";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { 
@@ -231,11 +232,7 @@ export function AddMoaDialog({ children }: { children?: React.ReactNode }) {
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl><SelectTrigger><SelectValue placeholder="Select college" /></SelectTrigger></FormControl>
                   <SelectContent>
-                    <SelectItem value="College of Computer Studies">College of Computer Studies</SelectItem>
-                    <SelectItem value="College of Engineering">College of Engineering</SelectItem>
-                    <SelectItem value="College of Business Administration">College of Business Administration</SelectItem>
-                    <SelectItem value="College of Hospitality Management">College of Hospitality Management</SelectItem>
-                    <SelectItem value="College of Arts and Sciences">College of Arts and Sciences</SelectItem>
+                    {NEU_COLLEGES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </FormItem>

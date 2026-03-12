@@ -28,30 +28,26 @@ import {
   Filter, 
   Edit, 
   Trash2, 
-  FileSpreadsheet,
   AlertCircle,
   Loader2,
   PlusCircle,
   Database
 } from "lucide-react";
-import { useCollection, useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError } from "@/firebase";
-import { collection, query, orderBy, doc, writeBatch, Timestamp } from "firebase/firestore";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, query, orderBy } from "firebase/firestore";
 import { AddMoaDialog } from "@/components/moa/add-moa-dialog";
-import { MOCK_MOAS, MOA } from "@/lib/mock-data";
-import { useToast } from "@/hooks/use-toast";
+import { MOA, NEU_COLLEGES } from "@/lib/mock-data";
 import { EditMoaDialog } from "@/components/moa/edit-moa-dialog";
 import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const db = useFirestore();
-  const { toast } = useToast();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [collegeFilter, setCollegeFilter] = useState("all");
   const [industryFilter, setIndustryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [isSeeding, setIsSeeding] = useState(false);
   const [editingMoa, setEditingMoa] = useState<MOA | null>(null);
 
   useEffect(() => {
@@ -75,7 +71,7 @@ export default function DashboardPage() {
   const isAdmin = user.role === 'ADMIN';
   const isFaculty = user.role === 'FACULTY';
 
-  const colleges = Array.from(new Set(moas?.map(m => m.college) || []));
+  const colleges = NEU_COLLEGES;
   const industries = Array.from(new Set(moas?.map(m => m.industryType) || []));
 
   const filteredMoas = useMemo(() => {
@@ -93,54 +89,6 @@ export default function DashboardPage() {
       return matchesSearch && matchesCollege && matchesIndustry && matchesStatus;
     });
   }, [moas, searchQuery, collegeFilter, industryFilter, statusFilter]);
-
-  const seedDatabase = async () => {
-    if (!db || isSeeding) return;
-    setIsSeeding(true);
-    
-    try {
-      const batch = writeBatch(db);
-      MOCK_MOAS.forEach((moa) => {
-        const docRef = doc(collection(db, "memoranda_of_agreement"));
-        
-        // Ensure 2-year validity if missing
-        let expDate: Date;
-        if (moa.expirationDate) {
-          expDate = new Date(moa.expirationDate);
-        } else {
-          expDate = new Date(moa.effectiveDate);
-          expDate.setFullYear(expDate.getFullYear() + 2);
-        }
-
-        batch.set(docRef, { 
-          ...moa, 
-          id: docRef.id,
-          expirationDate: Timestamp.fromDate(expDate)
-        });
-      });
-      
-      await batch.commit();
-      
-      toast({
-        title: "Database Seeded",
-        description: `${MOCK_MOAS.length} records populated with default 2-year validity.`,
-      });
-    } catch (error: any) {
-      errorEmitter.emit('permission-error', new FirestorePermissionError({
-        path: 'memoranda_of_agreement',
-        operation: 'create',
-        requestResourceData: MOCK_MOAS[0],
-      }));
-
-      toast({
-        variant: "destructive",
-        title: "Seeding Failed",
-        description: "Insufficient permissions to populate institutional records.",
-      });
-    } finally {
-      setIsSeeding(false);
-    }
-  };
 
   const isExpiring = (moa: any) => {
     if (moa.primaryStatus !== 'APPROVED') return false;
@@ -178,24 +126,10 @@ export default function DashboardPage() {
         <div>
           <h2 className="text-3xl font-extrabold tracking-tight text-primary">Admin Command Center</h2>
           <p className="text-muted-foreground mt-1 font-medium">
-            Institutional registry with default 2-year agreement validity.
+            
           </p>
         </div>
         <div className="flex gap-3">
-          {isAdmin && (
-            <Button 
-              variant="outline" 
-              className="border-accent text-accent-foreground hover:bg-accent/10 font-bold"
-              onClick={seedDatabase}
-              disabled={isSeeding}
-            >
-              {isSeeding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Database className="mr-2 h-4 w-4" />}
-              Seed 2-Year Data
-            </Button>
-          )}
-          <Button variant="outline" className="border-border font-semibold shadow-sm bg-white">
-            <FileSpreadsheet className="mr-2 h-4 w-4 text-muted-foreground" /> Export CSV
-          </Button>
           {(isAdmin || (isFaculty && user.canEdit)) && (
             <AddMoaDialog>
               <Button className="bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all font-semibold">
@@ -298,7 +232,7 @@ export default function DashboardPage() {
                         <div>
                           <p className="text-primary font-bold text-lg">No MOA records found.</p>
                           <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                            The institutional database is currently empty. Use <b>Seed 2-Year Data</b> to begin.
+                            The institutional database is currently empty. Add a new MOA to get started.
                           </p>
                         </div>
                       </div>

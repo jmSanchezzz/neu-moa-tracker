@@ -65,7 +65,7 @@ export function MoaStats({ moas }: MoaStatsProps) {
       bgColor: "bg-amber-50",
       trend: "+12.1%",
       isPositive: true,
-      link: "/dashboard/moas"
+      link: "/dashboard/moas?status=EXPIRING"
     },
     {
       title: "Total Partners",
@@ -82,12 +82,13 @@ export function MoaStats({ moas }: MoaStatsProps) {
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat) => (
-        <Card key={stat.title} className="relative overflow-hidden border border-slate-200 shadow-md group hover:border-accent/50 transition-all duration-300">
+        <Link key={stat.title} href={stat.link} className="block">
+        <Card className="relative overflow-hidden border border-slate-200 shadow-md group hover:border-accent/50 transition-all duration-300 cursor-pointer">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-black text-slate-500 uppercase tracking-[0.15em]">{stat.title}</CardTitle>
-            <Link href={stat.link} className="text-slate-300 group-hover:text-accent transition-colors">
+            <span className="text-slate-300 group-hover:text-accent transition-colors">
               <ArrowUpRight className="h-4 w-4" />
-            </Link>
+            </span>
           </CardHeader>
           <CardContent>
             <div className="flex items-end justify-between">
@@ -108,6 +109,7 @@ export function MoaStats({ moas }: MoaStatsProps) {
           </CardContent>
           <div className="absolute bottom-0 left-0 h-1 w-full bg-slate-100 group-hover:bg-accent transition-colors" />
         </Card>
+        </Link>
       ))}
     </div>
   );

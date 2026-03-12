@@ -41,8 +41,8 @@ export function AppSidebar() {
             <ShieldAlert className="w-5 h-5 text-sidebar-background" />
           </div>
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-            <span className="font-black text-lg tracking-tighter text-white">NEU TRACKER</span>
-            <span className="text-[10px] font-bold text-accent uppercase tracking-widest -mt-1">Academic Enterprise</span>
+            <span className="font-black text-lg tracking-tighter text-white">NEU MOA TRACKER</span>
+            <span className="text-[10px] font-bold text-accent uppercase tracking-widest -mt-1">Institutional use</span>
           </div>
         </div>
       </SidebarHeader>
@@ -66,7 +66,7 @@ export function AppSidebar() {
                 <SidebarMenuButton asChild tooltip="MOAs" className="hover:bg-sidebar-accent hover:text-white h-10 px-4 group">
                   <a href="/dashboard/moas">
                     <FileText className="group-hover:text-accent transition-colors" />
-                    <span className="font-bold">Active Records</span>
+                    <span className="font-bold">MOA Directory</span>
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
