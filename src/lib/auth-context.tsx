@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation';
 import { 
   signInAnonymously,
   signOut, 
-  onAuthStateChanged 
+  onAuthStateChanged,
+  getAuth
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { useAuth as useFirebaseAuth, useFirestore } from '@/firebase';
 import { User, UserRole } from '@/lib/mock-data';
 import { useToast } from '@/hooks/use-toast';
@@ -46,7 +47,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setIsLoading(true);
       const storedEmail = localStorage.getItem('neu_moa_test_session');
 
       if (firebaseUser && storedEmail) {
@@ -63,12 +63,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser(userData);
             }
           } else {
-            // If doc missing (new session for existing email), trigger re-bootstrap
+            // User is signed in to Auth but missing Firestore doc (e.g. initial login step)
+            // loginWithEmail will handle the doc creation
             await loginWithEmail(storedEmail);
           }
         } catch (e) {
           console.error("Auth sync error:", e);
         }
+      } else if (!firebaseUser && storedEmail) {
+        // Recover session if stored email exists but auth timed out
+        await loginWithEmail(storedEmail);
       } else {
         setUser(null);
       }
@@ -81,7 +85,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithEmail = async (email: string) => {
     const normalizedEmail = email.toLowerCase().trim();
     
-    // Strict domain check for institutional access
     if (!normalizedEmail.endsWith('@neu.edu.ph')) {
       toast({
         variant: "destructive",
@@ -92,16 +95,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // Simulate institutional OAuth via anonymous sign-in bridge
-      await signInAnonymously(auth);
+      // Avoid re-signing in if already authenticated with a valid UID
+      if (!auth.currentUser) {
+        await signInAnonymously(auth);
+      }
+      
       const currentUid = auth.currentUser?.uid;
-
       if (!currentUid) throw new Error("Failed to initialize session.");
       
       const isAdmin = ADMIN_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
       const isFaculty = FACULTY_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
 
-      // Default Role Assignment: Anyone with @neu.edu.ph is a STUDENT unless whitelisted
       let role: UserRole = 'STUDENT';
       let canEdit = false;
 
@@ -113,7 +117,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         canEdit = true;
       }
 
-      // Generate Name from Email (e.g., juan.dela.cruz@neu.edu.ph -> Juan Dela Cruz)
       const nameParts = normalizedEmail.split('@')[0].split('.');
       const formattedName = nameParts
         .map(s => s.charAt(0).toUpperCase() + s.slice(1))
@@ -128,11 +131,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         canEdit: canEdit,
       };
 
-      // Transactional write for user profile
+      // Atomic bootstrap of user profile and security roles
       const batch = writeBatch(db);
       batch.set(doc(db, 'users', currentUid), userData, { merge: true });
       
-      // If the user is an admin, we must also record it in roles_admin for Firestore Rules
       if (role === 'ADMIN') {
         batch.set(doc(db, 'roles_admin', currentUid), { uid: currentUid, email: normalizedEmail }, { merge: true });
       }
