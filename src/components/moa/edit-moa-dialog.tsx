@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect } from "react";
@@ -42,7 +43,7 @@ const moaFormSchema = z.object({
   contactPersonEmail: z.string().email("Invalid email address"),
   industryType: z.string().min(2, "Industry type is required"),
   effectiveDate: z.string().min(1, "Effective date is required"),
-  expirationDate: z.string().min(1, "Expiration date is required"),
+  expirationDate: z.string().optional(),
   college: z.string().min(1, "College endorsement is required"),
   primaryStatus: z.enum(["APPROVED", "PROCESSING", "EXPIRED"]),
   subStatus: z.string().min(1, "Stage detail is required"),
@@ -119,9 +120,18 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
     try {
       const docRef = doc(db, "memoranda_of_agreement", moa.id);
       
+      // Handle 2-year validity default
+      let finalExpiration: Date;
+      if (values.expirationDate) {
+        finalExpiration = new Date(values.expirationDate);
+      } else {
+        finalExpiration = new Date(values.effectiveDate);
+        finalExpiration.setFullYear(finalExpiration.getFullYear() + 2);
+      }
+
       const updateData = {
         ...values,
-        expirationDate: Timestamp.fromDate(new Date(values.expirationDate)),
+        expirationDate: Timestamp.fromDate(finalExpiration),
       };
       
       updateDocumentNonBlocking(docRef, updateData);

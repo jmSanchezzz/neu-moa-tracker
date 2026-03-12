@@ -37,10 +37,9 @@ import {
 import { useCollection, useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError } from "@/firebase";
 import { collection, query, orderBy, doc, writeBatch, Timestamp } from "firebase/firestore";
 import { AddMoaDialog } from "@/components/moa/add-moa-dialog";
-import { MOCK_MOAS } from "@/lib/mock-data";
+import { MOCK_MOAS, MOA } from "@/lib/mock-data";
 import { useToast } from "@/hooks/use-toast";
 import { EditMoaDialog } from "@/components/moa/edit-moa-dialog";
-import { MOA } from "@/lib/mock-data";
 import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
@@ -103,10 +102,20 @@ export default function DashboardPage() {
       const batch = writeBatch(db);
       MOCK_MOAS.forEach((moa) => {
         const docRef = doc(collection(db, "memoranda_of_agreement"));
+        
+        // Ensure 2-year validity if missing
+        let expDate: Date;
+        if (moa.expirationDate) {
+          expDate = new Date(moa.expirationDate);
+        } else {
+          expDate = new Date(moa.effectiveDate);
+          expDate.setFullYear(expDate.getFullYear() + 2);
+        }
+
         batch.set(docRef, { 
           ...moa, 
           id: docRef.id,
-          expirationDate: Timestamp.fromDate(new Date(moa.expirationDate))
+          expirationDate: Timestamp.fromDate(expDate)
         });
       });
       
@@ -114,7 +123,7 @@ export default function DashboardPage() {
       
       toast({
         title: "Database Seeded",
-        description: `${MOCK_MOAS.length} institutional records populated.`,
+        description: `${MOCK_MOAS.length} records populated with default 2-year validity.`,
       });
     } catch (error: any) {
       errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -126,7 +135,7 @@ export default function DashboardPage() {
       toast({
         variant: "destructive",
         title: "Seeding Failed",
-        description: "Insufficient permissions or sync error. Please refresh.",
+        description: "Insufficient permissions to populate institutional records.",
       });
     } finally {
       setIsSeeding(false);
@@ -169,7 +178,7 @@ export default function DashboardPage() {
         <div>
           <h2 className="text-3xl font-extrabold tracking-tight text-primary">Admin Command Center</h2>
           <p className="text-muted-foreground mt-1 font-medium">
-            Real-time institutional agreement monitoring and analytics.
+            Institutional registry with default 2-year agreement validity.
           </p>
         </div>
         <div className="flex gap-3">
@@ -181,7 +190,7 @@ export default function DashboardPage() {
               disabled={isSeeding}
             >
               {isSeeding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Database className="mr-2 h-4 w-4" />}
-              Seed Sample Data
+              Seed 2-Year Data
             </Button>
           )}
           <Button variant="outline" className="border-border font-semibold shadow-sm bg-white">
@@ -289,19 +298,9 @@ export default function DashboardPage() {
                         <div>
                           <p className="text-primary font-bold text-lg">No MOA records found.</p>
                           <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                            The institutional database is currently empty. Use the <b>Create Record</b> button or <b>Seed Sample Data</b> to begin.
+                            The institutional database is currently empty. Use <b>Seed 2-Year Data</b> to begin.
                           </p>
                         </div>
-                        {isAdmin && (
-                          <Button 
-                            variant="link" 
-                            className="text-primary font-bold" 
-                            onClick={seedDatabase}
-                            disabled={isSeeding}
-                          >
-                            Populate with sample data
-                          </Button>
-                        )}
                       </div>
                     </TableCell>
                   </TableRow>

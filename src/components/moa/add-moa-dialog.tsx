@@ -44,7 +44,7 @@ const moaFormSchema = z.object({
   contactPersonEmail: z.string().email(),
   industryType: z.string().min(2),
   effectiveDate: z.string().min(1),
-  expirationDate: z.string().min(1),
+  expirationDate: z.string().optional(),
   college: z.string().min(1),
   primaryStatus: z.enum(["PROCESSING", "APPROVED", "EXPIRED"]),
   subStatus: z.string(),
@@ -57,6 +57,10 @@ export function AddMoaDialog({ children }: { children?: React.ReactNode }) {
   const { toast } = useToast();
   const db = useFirestore();
 
+  const today = new Date();
+  const twoYearsLater = new Date();
+  twoYearsLater.setFullYear(today.getFullYear() + 2);
+
   const form = useForm<MoaFormValues>({
     resolver: zodResolver(moaFormSchema),
     defaultValues: {
@@ -66,8 +70,8 @@ export function AddMoaDialog({ children }: { children?: React.ReactNode }) {
       contactPerson: "",
       contactPersonEmail: "",
       industryType: "",
-      effectiveDate: new Date().toISOString().split('T')[0],
-      expirationDate: new Date(new Date().setFullYear(new Date().getFullYear() + 3)).toISOString().split('T')[0],
+      effectiveDate: today.toISOString().split('T')[0],
+      expirationDate: twoYearsLater.toISOString().split('T')[0],
       college: "",
       primaryStatus: "PROCESSING",
       subStatus: "AWAITING_HTE_SIGNATURE",
@@ -77,11 +81,23 @@ export function AddMoaDialog({ children }: { children?: React.ReactNode }) {
   const pStatus = form.watch("primaryStatus");
 
   async function onSubmit(values: MoaFormValues) {
+    if (!db) return;
+    
     try {
       const colRef = collection(db, "memoranda_of_agreement");
+      
+      // Default to 2 years if not specified
+      let finalExpiration: Date;
+      if (values.expirationDate) {
+        finalExpiration = new Date(values.expirationDate);
+      } else {
+        finalExpiration = new Date(values.effectiveDate);
+        finalExpiration.setFullYear(finalExpiration.getFullYear() + 2);
+      }
+
       addDocumentNonBlocking(colRef, {
         ...values,
-        expirationDate: Timestamp.fromDate(new Date(values.expirationDate)),
+        expirationDate: Timestamp.fromDate(finalExpiration),
         isDeleted: false,
         createdAt: new Date().toISOString(),
       });
@@ -185,7 +201,7 @@ export function AddMoaDialog({ children }: { children?: React.ReactNode }) {
               )} />
               <FormField control={form.control} name="expirationDate" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="font-bold text-xs uppercase text-slate-500">Expiration Date</FormLabel>
+                  <FormLabel className="font-bold text-xs uppercase text-slate-500">Expiration Date (Default 2 Years)</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
                 </FormItem>
               )} />
@@ -200,6 +216,8 @@ export function AddMoaDialog({ children }: { children?: React.ReactNode }) {
                     <SelectItem value="College of Computer Studies">College of Computer Studies</SelectItem>
                     <SelectItem value="College of Engineering">College of Engineering</SelectItem>
                     <SelectItem value="College of Business Administration">College of Business Administration</SelectItem>
+                    <SelectItem value="College of Hospitality Management">College of Hospitality Management</SelectItem>
+                    <SelectItem value="College of Arts and Sciences">College of Arts and Sciences</SelectItem>
                   </SelectContent>
                 </Select>
               </FormItem>
