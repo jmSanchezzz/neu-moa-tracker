@@ -32,9 +32,9 @@ import {
 } from "@/components/ui/select";
 import { PlusCircle } from "lucide-react";
 import { useFirestore } from "@/firebase";
-import { collection, Timestamp } from "firebase/firestore";
-import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { collection, doc, writeBatch, Timestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth-context";
 
 const moaFormSchema = z.object({
   hteId: z.string().min(2),
@@ -54,6 +54,7 @@ type MoaFormValues = z.infer<typeof moaFormSchema>;
 
 export function AddMoaDialog({ children }: { children?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const { user } = useAuth();
   const { toast } = useToast();
   const db = useFirestore();
 
@@ -81,10 +82,11 @@ export function AddMoaDialog({ children }: { children?: React.ReactNode }) {
   const pStatus = form.watch("primaryStatus");
 
   async function onSubmit(values: MoaFormValues) {
-    if (!db) return;
+    if (!db || !user) return;
     
     try {
-      const colRef = collection(db, "memoranda_of_agreement");
+      const batch = writeBatch(db);
+      const moaRef = doc(collection(db, "memoranda_of_agreement"));
       
       // Default to 2 years if not specified
       let finalExpiration: Date;
@@ -95,14 +97,30 @@ export function AddMoaDialog({ children }: { children?: React.ReactNode }) {
         finalExpiration.setFullYear(finalExpiration.getFullYear() + 2);
       }
 
-      addDocumentNonBlocking(colRef, {
+      const moaData = {
         ...values,
+        id: moaRef.id,
         expirationDate: Timestamp.fromDate(finalExpiration),
         isDeleted: false,
-        createdAt: new Date().toISOString(),
+        createdAt: Timestamp.now(),
+      };
+
+      batch.set(moaRef, moaData);
+
+      // Create Audit Log
+      const logRef = doc(collection(db, "audit_logs"));
+      batch.set(logRef, {
+        userId: user.id,
+        userName: user.name,
+        operation: 'INSERT',
+        moaId: moaRef.id,
+        timestamp: Timestamp.now(),
+        details: `Created new institutional agreement for ${values.companyName}.`
       });
       
-      toast({ title: "Record Created", description: "The institutional agreement has been registered." });
+      await batch.commit();
+      
+      toast({ title: "Record Created", description: "The institutional agreement has been registered and audited." });
       setOpen(false);
       form.reset();
     } catch (error) {

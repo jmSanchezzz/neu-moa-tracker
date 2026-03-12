@@ -24,9 +24,9 @@ import { MoreVertical, Edit, Trash, RotateCcw, Eye, AlertCircle } from "lucide-r
 import { EditMoaDialog } from "./edit-moa-dialog";
 import { ViewMoaDialog } from "./view-moa-dialog";
 import { useFirestore } from "@/firebase";
-import { doc } from "firebase/firestore";
-import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { doc, writeBatch, collection, Timestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth-context";
 
 type MoaTableProps = {
   data: MOA[];
@@ -35,6 +35,7 @@ type MoaTableProps = {
 };
 
 export function MoaTable({ data, role, canEdit }: MoaTableProps) {
+  const { user } = useAuth();
   const { toast } = useToast();
   const db = useFirestore();
   const [editingMoa, setEditingMoa] = useState<MOA | null>(null);
@@ -44,14 +45,39 @@ export function MoaTable({ data, role, canEdit }: MoaTableProps) {
   const isFaculty = role === 'FACULTY';
   const isStudent = role === 'STUDENT';
 
-  const handleSoftDelete = (moa: MOA) => {
-    if (!db) return;
-    const docRef = doc(db, "memoranda_of_agreement", moa.id);
-    updateDocumentNonBlocking(docRef, { isDeleted: true });
-    toast({
-      title: "Record Archived",
-      description: `${moa.companyName} has been moved to trash.`,
-    });
+  const handleSoftDelete = async (moa: MOA) => {
+    if (!db || !user) return;
+    
+    try {
+      const batch = writeBatch(db);
+      const docRef = doc(db, "memoranda_of_agreement", moa.id);
+      
+      batch.update(docRef, { isDeleted: true });
+
+      // Create Audit Log
+      const logRef = doc(collection(db, "audit_logs"));
+      batch.set(logRef, {
+        userId: user.id,
+        userName: user.name,
+        operation: 'DELETE',
+        moaId: moa.id,
+        timestamp: Timestamp.now(),
+        details: `Archived institutional record for ${moa.companyName}.`
+      });
+      
+      await batch.commit();
+      
+      toast({
+        title: "Record Archived",
+        description: `${moa.companyName} has been moved to trash and audited.`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to archive record.",
+      });
+    }
   };
 
   const isExpiring = (moa: MOA) => {

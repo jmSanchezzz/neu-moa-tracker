@@ -30,10 +30,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useFirestore } from "@/firebase";
-import { doc, Timestamp } from "firebase/firestore";
-import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { doc, Timestamp, writeBatch, collection } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { MOA } from "@/lib/mock-data";
+import { useAuth } from "@/lib/auth-context";
 
 const moaFormSchema = z.object({
   hteId: z.string().min(2, "HTE ID is required"),
@@ -58,6 +58,7 @@ type EditMoaDialogProps = {
 };
 
 export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
+  const { user } = useAuth();
   const { toast } = useToast();
   const db = useFirestore();
 
@@ -82,7 +83,6 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
 
   useEffect(() => {
     if (moa) {
-      // Safe Date Conversion Utility
       let expDateStr = "";
       if (moa.expirationDate) {
         try {
@@ -115,12 +115,12 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
   }, [moa, form]);
 
   async function onSubmit(values: MoaFormValues) {
-    if (!moa || !db) return;
+    if (!moa || !db || !user) return;
     
     try {
+      const batch = writeBatch(db);
       const docRef = doc(db, "memoranda_of_agreement", moa.id);
       
-      // Handle 2-year validity default
       let finalExpiration: Date;
       if (values.expirationDate) {
         finalExpiration = new Date(values.expirationDate);
@@ -134,11 +134,24 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
         expirationDate: Timestamp.fromDate(finalExpiration),
       };
       
-      updateDocumentNonBlocking(docRef, updateData);
+      batch.update(docRef, updateData);
+
+      // Create Audit Log
+      const logRef = doc(collection(db, "audit_logs"));
+      batch.set(logRef, {
+        userId: user.id,
+        userName: user.name,
+        operation: 'EDIT',
+        moaId: moa.id,
+        timestamp: Timestamp.now(),
+        details: `Updated registry details for ${values.companyName}.`
+      });
+      
+      await batch.commit();
       
       toast({
         title: "Record Updated",
-        description: `${values.companyName} MOA has been updated.`,
+        description: "The institutional registry and audit trail have been updated.",
       });
       
       onOpenChange(false);
