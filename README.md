@@ -1,64 +1,76 @@
 # NEU MOA Tracker
 
-NEU MOA Tracker is a Next.js and Firebase application for managing Memoranda of Agreement (MOAs) at New Era University. The current build includes a role-aware dashboard, MOA CRUD workflows, admin-only IAM and audit pages, seeded demo data, and an optional Genkit-powered search suggestion flow.
+NEU MOA Tracker is a Next.js and Firebase application for managing Memoranda of Agreement (MOAs) at New Era University. The current build includes a role-aware dashboard, full MOA CRUD workflows, archive/restore, status and college filtering, interactive stat cards, and admin-only IAM and audit pages.
 
 ## Overview
 
-This project is built as an internal registry for institutional partnership records. Users type the local-part of their institutional email, complete Google Sign-In with the matching `@neu.edu.ph` account, and are routed to dashboards that match their access level.
+This project is an internal registry for institutional partnership records. Users type the local-part of their institutional email, complete Google Sign-In with the matching `@neu.edu.ph` account, and are routed to dashboards that match their access level.
 
-The system currently centers on four areas:
+The system centers on four areas:
 
-- MOA record viewing, filtering, creation, editing, and soft delete.
+- MOA record viewing, filtering, creation, editing, soft delete, and archive/restore.
 - Role-based access for Admin, Faculty, and Student users.
-- Admin pages for user access control, audit trail review, and sample-data seeding.
-- AI-assisted search suggestions through Genkit and Gemini.
+- Admin pages for user access control (IAM) and audit trail review.
+- An interactive Command Center dashboard with clickable stat cards.
 
 ## Current System Behavior
 
 ### Authentication and Roles
 
-- Login now uses Firebase Google Sign-In.
-- Users type only the local-part of their NEU email on the login page, while the `@neu.edu.ph` suffix is fixed in the UI.
+- Login uses Firebase Google Sign-In.
+- Users type only the local-part of their NEU email on the login page; the `@neu.edu.ph` suffix is fixed in the UI.
 - The Google account selected during sign-in must exactly match the typed institutional email.
-- Firebase Auth is now the source of truth for the signed-in identity and session persistence.
-- Role assignment still defaults from the authenticated email for newly bootstrapped users:
+- Firebase Auth is the source of truth for the signed-in identity and session persistence.
+- Role assignment defaults from the authenticated email for newly bootstrapped users:
   - Admin emails: `johnmarc.sanchez@neu.edu.ph`, `johnmarc@neu.edu.ph`, `admin@neu.edu.ph`
   - Faculty emails: `faculty@neu.edu.ph`, `professor@neu.edu.ph`
   - Any other `@neu.edu.ph` address defaults to Student
-- User profiles are written to the `users` collection in Firestore.
-- Existing Firestore user profiles continue to be used for blocked-state checks and persisted permissions.
+- User profiles are written to the `users` Firestore collection.
+- Prototype (anonymous) sign-in is supported for demo accounts using a custom provider bypass in Firestore rules.
 
 ### MOA Management
 
-- Admin and Faculty users with edit rights can create MOA records.
-- Admin and Faculty users with edit rights can edit existing MOA records.
-- Records can be soft-deleted by setting `isDeleted: true`.
-- The main MOA views support keyword search and college filtering.
-- Expiring agreements can be filtered to those within the next 60 days.
-- Status reporting is based on `PROCESSING`, `APPROVED`, and `EXPIRED`, with additional sub-status detail.
+- Admin and Faculty users with edit rights can create and edit MOA records.
+- Records are soft-deleted (`isDeleted: true`) rather than permanently removed.
+- Soft-deleted records are moved to the **Archived / Trash** view, accessible from the sidebar.
+- Archived records can be individually restored (`isDeleted: false`) with a full audit log entry.
+- Every create, edit, delete, and restore action is written to the `audit_logs` Firestore collection.
+- MOA records have a `primaryStatus` (`PROCESSING`, `APPROVED`, `EXPIRED`) and a `subStatus` for stage detail.
+- Each MOA stores an `effectiveDate` and an `expirationDate`.
 
-### Administration
+### MOA Directory (All Roles)
 
-- The admin dashboard shows high-level MOA stats and filtering controls.
-- IAM Management lets admins block or restore users and toggle edit rights.
-- Audit Logs reads the latest entries from the `audit_logs` collection.
-- Settings includes a seed action that inserts sample MOA data and matching audit log entries.
+- Accessible at `/dashboard/moas`.
+- Supports keyword search across company name and HTE ID.
+- **Filter by College** dropdown filters results by the NEU college linked to the MOA.
+- **Filter by Status** dropdown (Admin and Faculty only) filters by `PROCESSING`, `APPROVED`, or `EXPIRED`.
+- **View Expiring (60 Days)** button (Admin and Faculty only) switches to a Firestore-backed query that returns only `APPROVED` records expiring within the next 60 days.
+- Full record details are accessible via **View Details** for all roles.
+- Students see only `APPROVED` records and a simplified 4-column table (Company Name, Address, Contact Person, Contact Email) with no action controls.
+- The archive view (`?filter=deleted`) shows only soft-deleted records with a **Restore** action.
 
-### AI Search
+### Command Center Dashboard (Admin and Faculty)
 
-- The MOA search UI includes an AI suggestion button.
-- Suggestions are generated through a Genkit flow in [src/ai/flows/intelligent-moa-search.ts](src/ai/flows/intelligent-moa-search.ts).
-- The configured model is Gemini 2.5 Flash in [src/ai/genkit.ts](src/ai/genkit.ts).
-- AI suggestions are optional. The rest of the app works without using that feature.
+- Accessible at `/dashboard`.
+- Displays four clickable stat cards: **Active Agreements**, **Processing Queue**, **Critical Expiring**, and **Total Partners**.
+- Clicking a card navigates to the MOA Directory pre-filtered to that status.
+- Includes a full MOA table with search, college, industry, and status filters.
+- Admin users can create new records directly from this page.
+
+### Administration (Admin only)
+
+- **IAM Management** — block or unblock users and toggle per-user edit rights.
+- **System Audit Logs** — reads the latest entries from the `audit_logs` collection.
+- **Control Panel** — configure default validity period and notification thresholds. Presentational controls that do not yet persist changes are clearly scoped.
 
 ## Implemented Pages
 
 - [src/app/login/page.tsx](src/app/login/page.tsx): Fixed-domain institutional email input with Google Sign-In.
-- [src/app/dashboard/page.tsx](src/app/dashboard/page.tsx): Admin and Faculty command center.
-- [src/app/dashboard/moas/page.tsx](src/app/dashboard/moas/page.tsx): MOA records view for all roles.
+- [src/app/dashboard/page.tsx](src/app/dashboard/page.tsx): Admin and Faculty command center with stats and full MOA table.
+- [src/app/dashboard/moas/page.tsx](src/app/dashboard/moas/page.tsx): MOA Directory for all roles — normal and archive views.
 - [src/app/dashboard/users/page.tsx](src/app/dashboard/users/page.tsx): Admin-only IAM management.
 - [src/app/dashboard/audit/page.tsx](src/app/dashboard/audit/page.tsx): Admin-only audit log viewer.
-- [src/app/dashboard/settings/page.tsx](src/app/dashboard/settings/page.tsx): Admin control panel and seeding tools.
+- [src/app/dashboard/settings/page.tsx](src/app/dashboard/settings/page.tsx): Admin control panel.
 
 ## Tech Stack
 
@@ -68,7 +80,6 @@ The system currently centers on four areas:
 - Tailwind CSS
 - Radix UI / shadcn-style components
 - Firebase Auth and Firestore
-- Genkit with `@genkit-ai/google-genai`
 - Lucide React
 
 ## Local Development
@@ -77,14 +88,31 @@ The system currently centers on four areas:
 
 - Node.js 20 or later is recommended.
 - npm is used as the package manager.
-- A Firebase project with Auth and Firestore enabled is required if you want full data persistence beyond local UI behavior.
-- Google AI credentials are required only if you want the AI suggestion feature to work.
+- A Firebase project with Auth and Firestore enabled is required for full data persistence.
 
 ### Install
 
 ```bash
 npm install
 ```
+
+### Environment
+
+Create a `.env.local` file using `.env.example` as the template.
+
+The app reads these public Firebase web config values:
+
+```env
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+```
+
+The current Firebase config in [src/firebase/config.ts](src/firebase/config.ts) uses these environment variables first and falls back to local defaults when they are not set.
 
 ### Run the app
 
@@ -102,27 +130,38 @@ npm run build
 npm run start
 npm run lint
 npm run typecheck
-npm run genkit:dev
-npm run genkit:watch
 ```
 
 ## Firebase Notes
 
-- Firebase client config is defined in [src/firebase/config.ts](src/firebase/config.ts).
-- Google must be enabled as a sign-in provider in Firebase Authentication for login to work.
+- Firebase client config is in [src/firebase/config.ts](src/firebase/config.ts).
+- `.env.local` is gitignored. Use `.env.example` as the tracked template.
+- Firebase web config values are public client configuration, not admin secrets.
+- Google must be enabled as a sign-in provider in Firebase Authentication.
 - Firestore is the source of truth for users, MOA records, and audit logs.
-- Security rules and index definitions are included in [firestore.rules](firestore.rules) and [firestore.indexes.json](firestore.indexes.json).
-- The code expects collections such as `users`, `memoranda_of_agreement`, `audit_logs`, and `roles_admin`.
+- Security rules and composite index definitions are in [firestore.rules](firestore.rules) and [firestore.indexes.json](firestore.indexes.json).
+- A composite index on `memoranda_of_agreement` (`primaryStatus ASC`, `expirationDate ASC`) is required for the expiring-soon query.
+- Expected Firestore collections: `users`, `memoranda_of_agreement`, `audit_logs`, `roles_admin`.
+
+## Vercel Deployment
+
+1. Import the repository into Vercel.
+2. Let Vercel detect the app as a Next.js project.
+3. Add the same `NEXT_PUBLIC_FIREBASE_*` values from your local `.env.local` to the Vercel project environment variables.
+4. Redeploy after saving the environment variables.
+5. In Firebase Authentication, add your Vercel domain to the list of authorized domains.
+
+The default scripts used by Vercel are already present in [package.json](package.json): `npm install` and `npm run build`.
 
 ## Demo Access
 
 Type one of these email local-parts on the login page, then choose the matching Google account during sign-in:
 
-| Role | Email | Behavior |
+| Role | Email | Access |
 | :--- | :--- | :--- |
-| Admin | `johnmarc.sanchez` | Sign in as `johnmarc.sanchez@neu.edu.ph` for full access to dashboard, users, audit, settings, create/edit, and seed actions |
-| Faculty | `faculty` | Sign in as `faculty@neu.edu.ph` for dashboard and MOA management with edit rights enabled by default |
-| Student | `student` | Sign in as `student@neu.edu.ph` for the MOA records page with read-only behavior |
+| Admin | `johnmarc.sanchez` | Full access — Command Center, MOA Directory, IAM, Audit Logs, Control Panel, create/edit/delete/restore |
+| Faculty | `faculty` | Command Center, MOA Directory with create/edit rights, archive view |
+| Student | `student` | MOA Directory (approved records only, read-only, simplified table) |
 
 Any other `@neu.edu.ph` email signs in as a Student user.
 
@@ -131,15 +170,12 @@ Any other `@neu.edu.ph` email signs in as a Student user.
 - [src/app](src/app): Route segments, pages, and layouts.
 - [src/components](src/components): Shared UI building blocks and feature components.
 - [src/components/moa](src/components/moa): MOA dialogs, table, stats, and search UI.
-- [src/components/dashboard](src/components/dashboard): Sidebar and dashboard-specific shell components.
+- [src/components/dashboard](src/components/dashboard): Sidebar and dashboard shell components.
 - [src/firebase](src/firebase): Firebase initialization, hooks, providers, and non-blocking updates.
-- [src/ai](src/ai): Genkit setup and AI flows.
-- [src/lib](src/lib): Auth context, mock data, utility helpers, and placeholder assets.
+- [src/lib](src/lib): Auth context, data types, utility helpers, and placeholder assets.
 - [docs](docs): Supporting project documents.
 
 ## Current Limitations
 
-- Role defaults are still derived from hardcoded email mappings for newly bootstrapped users; they are not yet managed server-side.
-- Some settings controls are presentational and do not yet persist configuration changes.
-- The sidebar includes an archived/trash link, but the MOA page does not currently apply a dedicated deleted-record filter from the query string.
-- AI search depends on external model credentials and availability.
+- Role defaults are derived from hardcoded email mappings for newly bootstrapped users; server-side role management is not yet implemented.
+- Some Control Panel settings (notification thresholds, default validity) are presentational and do not persist.
