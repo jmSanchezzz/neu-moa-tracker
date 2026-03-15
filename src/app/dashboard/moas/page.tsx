@@ -29,6 +29,7 @@ export default function MoasPage() {
   const statusParam = searchParams.get('status');
   const [searchQuery, setSearchQuery] = useState("");
   const [collegeFilter, setCollegeFilter] = useState("all");
+  const [industryFilter, setIndustryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState(
     statusParam && statusParam !== 'EXPIRING' ? statusParam : 'all'
   );
@@ -65,6 +66,7 @@ export default function MoasPage() {
   const isFaculty = user.role === 'FACULTY';
   
   const colleges = NEU_COLLEGES;
+  const industries = Array.from(new Set((moas || []).map((moa) => moa.industryType).filter(Boolean)));
 
   const isStudent = user.role === 'STUDENT';
 
@@ -88,9 +90,10 @@ export default function MoasPage() {
         moa.hteId.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesCollege = collegeFilter === "all" || moa.college === collegeFilter;
-      return matchesSearch && matchesCollege;
+      const matchesIndustry = industryFilter === "all" || moa.industryType === industryFilter;
+      return matchesSearch && matchesCollege && matchesIndustry;
     });
-  }, [moas, searchQuery, collegeFilter, statusFilter, isStudent, isArchiveView]);
+  }, [moas, searchQuery, collegeFilter, industryFilter, statusFilter, isStudent, isArchiveView]);
 
   return (
     <div className="space-y-6">
@@ -117,7 +120,7 @@ export default function MoasPage() {
             </Button>
           )}
           {!isArchiveView && (isAdmin || (isFaculty && user.canEdit)) && (
-            <AddMoaDialog>
+            <AddMoaDialog industryOptions={industries}>
               <Button className="bg-primary"><PlusCircle className="mr-2 h-4 w-4" /> Add New MOA</Button>
             </AddMoaDialog>
           )}
@@ -134,6 +137,18 @@ export default function MoasPage() {
               <SelectContent>
                 <SelectItem value="all">All Colleges</SelectItem>
                 {colleges.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Filter by Industry</Label>
+            <Select value={industryFilter} onValueChange={setIndustryFilter}>
+              <SelectTrigger className="w-[220px]"><SelectValue placeholder="All Industries" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Industries</SelectItem>
+                {industries.map((industry) => (
+                  <SelectItem key={industry} value={industry}>{industry}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -157,7 +172,7 @@ export default function MoasPage() {
       {isLoading ? (
         <div className="flex items-center justify-center h-48"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
       ) : (
-        <MoaTable data={filteredData as any} role={user.role} canEdit={user.canEdit} />
+        <MoaTable data={filteredData as any} role={user.role} canEdit={user.canEdit} industryOptions={industries} />
       )}
     </div>
   );

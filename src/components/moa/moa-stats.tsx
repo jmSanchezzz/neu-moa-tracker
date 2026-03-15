@@ -6,10 +6,12 @@ import { CheckCircle2, Clock, AlertTriangle, Users, ArrowUpRight, TrendingUp, Tr
 import Link from "next/link";
 
 type MoaStatsProps = {
-  moas: MOA[];
+  moas?: MOA[] | null;
 };
 
 export function MoaStats({ moas }: MoaStatsProps) {
+  const safeMoas = Array.isArray(moas) ? moas : [];
+
   // Expiring logic: APPROVED and within 60 days
   const isExpiring = (moa: any) => {
     if (moa.primaryStatus !== 'APPROVED') return false;
@@ -31,10 +33,10 @@ export function MoaStats({ moas }: MoaStatsProps) {
     }
   };
 
-  const activeCount = moas.filter(m => m.primaryStatus === 'APPROVED' && !m.isDeleted).length;
-  const processingCount = moas.filter(m => m.primaryStatus === 'PROCESSING' && !m.isDeleted).length;
-  const expiringCount = moas.filter(m => isExpiring(m) && !m.isDeleted).length;
-  const totalCount = moas.length;
+  const activeCount = safeMoas.filter(m => m.primaryStatus === 'APPROVED' && !m.isDeleted).length;
+  const processingCount = safeMoas.filter(m => m.primaryStatus === 'PROCESSING' && !m.isDeleted).length;
+  const expiringCount = safeMoas.filter(m => isExpiring(m) && !m.isDeleted).length;
+  const totalCount = safeMoas.length;
 
   const stats = [
     {

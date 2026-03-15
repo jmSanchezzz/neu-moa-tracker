@@ -73,5 +73,10 @@ service cloud.firestore {
     match /audit_logs/{auditLogId} {
       allow read, write: if isAdmin();
     }
+
+    match /system_config/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
   }
 }

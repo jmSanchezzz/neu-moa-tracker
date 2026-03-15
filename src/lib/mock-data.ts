@@ -67,6 +67,13 @@ export type AuditLog = {
   timestamp: string;
 };
 
+export type InstitutionalSecuritySettings = {
+  maintenanceMode: boolean;
+  auditLoggingEnabled: boolean;
+  updatedAt?: any;
+  updatedBy?: string;
+};
+
 export const MOCK_MOAS: any[] = [
   {
     id: '1',

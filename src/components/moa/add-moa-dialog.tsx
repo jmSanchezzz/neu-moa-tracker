@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { NEU_COLLEGES } from "@/lib/mock-data";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -43,7 +43,7 @@ const moaFormSchema = z.object({
   companyAddress: z.string().min(5),
   contactPerson: z.string().min(2),
   contactPersonEmail: z.string().email(),
-  industryType: z.string().min(2),
+  industryType: z.string().min(2, "Industry is required"),
   effectiveDate: z.string().min(1),
   expirationDate: z.string().optional(),
   college: z.string().min(1),
@@ -53,11 +53,24 @@ const moaFormSchema = z.object({
 
 type MoaFormValues = z.infer<typeof moaFormSchema>;
 
-export function AddMoaDialog({ children }: { children?: React.ReactNode }) {
+type AddMoaDialogProps = {
+  children?: React.ReactNode;
+  industryOptions?: string[];
+};
+
+const OTHER_INDUSTRY_VALUE = "__other__";
+
+export function AddMoaDialog({ children, industryOptions = [] }: AddMoaDialogProps) {
   const [open, setOpen] = useState(false);
+  const [selectedIndustry, setSelectedIndustry] = useState("");
+  const [otherIndustry, setOtherIndustry] = useState("");
   const { user } = useAuth();
   const { toast } = useToast();
   const db = useFirestore();
+
+  const normalizedIndustryOptions = useMemo(() => {
+    return Array.from(new Set(industryOptions.map((industry) => industry.trim()).filter(Boolean)));
+  }, [industryOptions]);
 
   const today = new Date();
   const twoYearsLater = new Date();
@@ -84,6 +97,15 @@ export function AddMoaDialog({ children }: { children?: React.ReactNode }) {
 
   async function onSubmit(values: MoaFormValues) {
     if (!db || !user) return;
+
+    const resolvedIndustry = selectedIndustry === OTHER_INDUSTRY_VALUE
+      ? otherIndustry.trim()
+      : selectedIndustry;
+
+    if (resolvedIndustry.length < 2) {
+      form.setError("industryType", { message: "Industry is required" });
+      return;
+    }
     
     try {
       const batch = writeBatch(db);
@@ -100,6 +122,7 @@ export function AddMoaDialog({ children }: { children?: React.ReactNode }) {
 
       const moaData = {
         ...values,
+        industryType: resolvedIndustry,
         id: moaRef.id,
         expirationDate: Timestamp.fromDate(finalExpiration),
         isDeleted: false,
@@ -124,13 +147,25 @@ export function AddMoaDialog({ children }: { children?: React.ReactNode }) {
       toast({ title: "Record Created", description: "The institutional agreement has been registered and audited." });
       setOpen(false);
       form.reset();
+      setSelectedIndustry("");
+      setOtherIndustry("");
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "Failed to create record." });
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) {
+          form.reset();
+          setSelectedIndustry("");
+          setOtherIndustry("");
+        }
+      }}
+    >
       <DialogTrigger asChild>
         {children || <Button className="bg-primary"><PlusCircle className="mr-2 h-4 w-4" /> Create Record</Button>}
       </DialogTrigger>
@@ -206,7 +241,40 @@ export function AddMoaDialog({ children }: { children?: React.ReactNode }) {
               <FormField control={form.control} name="industryType" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="font-bold text-xs uppercase text-slate-500">Industry</FormLabel>
-                  <FormControl><Input {...field} /></FormControl>
+                  <Select
+                    value={selectedIndustry}
+                    onValueChange={(value) => {
+                      setSelectedIndustry(value);
+                      if (value === OTHER_INDUSTRY_VALUE) {
+                        field.onChange(otherIndustry);
+                        return;
+                      }
+                      setOtherIndustry("");
+                      field.onChange(value);
+                    }}
+                  >
+                    <FormControl><SelectTrigger><SelectValue placeholder="Select industry" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {normalizedIndustryOptions.map((industry) => (
+                        <SelectItem key={industry} value={industry}>{industry}</SelectItem>
+                      ))}
+                      <SelectItem value={OTHER_INDUSTRY_VALUE}>Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {selectedIndustry === OTHER_INDUSTRY_VALUE && (
+                    <FormControl>
+                      <Input
+                        placeholder="Enter industry"
+                        value={otherIndustry}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setOtherIndustry(value);
+                          field.onChange(value);
+                        }}
+                      />
+                    </FormControl>
+                  )}
+                  <FormMessage />
                 </FormItem>
               )} />
             </div>

@@ -32,9 +32,10 @@ type MoaTableProps = {
   data: MOA[];
   role: UserRole;
   canEdit?: boolean;
+  industryOptions?: string[];
 };
 
-export function MoaTable({ data, role, canEdit }: MoaTableProps) {
+export function MoaTable({ data, role, canEdit, industryOptions = [] }: MoaTableProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const db = useFirestore();
@@ -255,7 +256,8 @@ export function MoaTable({ data, role, canEdit }: MoaTableProps) {
       <EditMoaDialog 
         moa={editingMoa} 
         open={!!editingMoa} 
-        onOpenChange={(open) => !open && setEditingMoa(null)} 
+        onOpenChange={(open) => !open && setEditingMoa(null)}
+        industryOptions={industryOptions}
       />
       
       <ViewMoaDialog 

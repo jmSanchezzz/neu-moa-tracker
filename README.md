@@ -178,4 +178,4 @@ Any other `@neu.edu.ph` email signs in as a Student user.
 ## Current Limitations
 
 - Role defaults are derived from hardcoded email mappings for newly bootstrapped users; server-side role management is not yet implemented.
-- Some Control Panel settings (notification thresholds, default validity) are presentational and do not persist.
+- Some Control Panel settings (notification thresholds, default validity) are still presentational and do not persist, while Institutional Security toggles now persist.

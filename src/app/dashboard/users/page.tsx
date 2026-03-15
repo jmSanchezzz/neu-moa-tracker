@@ -30,6 +30,7 @@ export default function UsersPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const isAdmin = currentUser?.role === 'ADMIN';
 
   useEffect(() => {
     if (currentUser && currentUser.role !== 'ADMIN') {
@@ -38,9 +39,9 @@ export default function UsersPage() {
   }, [currentUser, router]);
 
   const usersQuery = useMemoFirebase(() => {
-    if (!db) return null;
+    if (!db || !isAdmin) return null;
     return query(collection(db, "users"));
-  }, [db]);
+  }, [db, isAdmin]);
 
   const { data: rawUsers, isLoading } = useCollection(usersQuery);
 

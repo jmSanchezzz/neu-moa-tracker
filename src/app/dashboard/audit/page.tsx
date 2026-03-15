@@ -22,6 +22,7 @@ export default function AuditPage() {
   const { user } = useAuth();
   const router = useRouter();
   const db = useFirestore();
+  const isAdmin = user?.role === 'ADMIN';
 
   useEffect(() => {
     if (user && user.role !== 'ADMIN') {
@@ -30,13 +31,13 @@ export default function AuditPage() {
   }, [user, router]);
 
   const auditQuery = useMemoFirebase(() => {
-    if (!db) return null;
+    if (!db || !isAdmin) return null;
     return query(
       collection(db, "audit_logs"),
       orderBy("timestamp", "desc"),
       limit(100)
     );
-  }, [db]);
+  }, [db, isAdmin]);
 
   const { data: logs, isLoading } = useCollection(auditQuery);
 

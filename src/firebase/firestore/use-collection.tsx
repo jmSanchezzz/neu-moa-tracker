@@ -85,13 +85,14 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
-        console.error('Firestore onSnapshot error:', error.code, error.message);
-
         if (error.code === 'permission-denied') {
           const path: string =
             memoizedTargetRefOrQuery.type === 'collection'
               ? (memoizedTargetRefOrQuery as CollectionReference).path
               : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
+
+          // Handled permission errors are emitted globally; avoid console.error overlay noise.
+          console.warn('Firestore onSnapshot permission-denied:', path);
 
           const contextualError = new FirestorePermissionError({
             operation: 'list',
@@ -104,6 +105,7 @@ export function useCollection<T = any>(
 
           errorEmitter.emit('permission-error', contextualError);
         } else {
+          console.error('Firestore onSnapshot error:', error.code, error.message);
           setError(error)
           setData(null)
           setIsLoading(false)

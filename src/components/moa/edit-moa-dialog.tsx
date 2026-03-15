@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -55,12 +55,21 @@ type EditMoaDialogProps = {
   moa: MOA | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  industryOptions?: string[];
 };
 
-export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
+const OTHER_INDUSTRY_VALUE = "__other__";
+
+export function EditMoaDialog({ moa, open, onOpenChange, industryOptions = [] }: EditMoaDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const db = useFirestore();
+  const [selectedIndustry, setSelectedIndustry] = useState("");
+  const [otherIndustry, setOtherIndustry] = useState("");
+
+  const normalizedIndustryOptions = useMemo(() => {
+    return Array.from(new Set(industryOptions.map((industry) => industry.trim()).filter(Boolean)));
+  }, [industryOptions]);
 
   const form = useForm<MoaFormValues>({
     resolver: zodResolver(moaFormSchema),
@@ -111,11 +120,32 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
         primaryStatus: moa.primaryStatus || "PROCESSING",
         subStatus: moa.subStatus || "AWAITING_HTE_SIGNATURE",
       });
+
+      const normalizedMoaIndustry = (moa.industryType || "").trim();
+      if (!normalizedMoaIndustry) {
+        setSelectedIndustry("");
+        setOtherIndustry("");
+      } else if (normalizedIndustryOptions.includes(normalizedMoaIndustry)) {
+        setSelectedIndustry(normalizedMoaIndustry);
+        setOtherIndustry("");
+      } else {
+        setSelectedIndustry(OTHER_INDUSTRY_VALUE);
+        setOtherIndustry(normalizedMoaIndustry);
+      }
     }
-  }, [moa, form]);
+  }, [moa, form, normalizedIndustryOptions]);
 
   async function onSubmit(values: MoaFormValues) {
     if (!moa || !db || !user) return;
+
+    const resolvedIndustry = selectedIndustry === OTHER_INDUSTRY_VALUE
+      ? otherIndustry.trim()
+      : selectedIndustry;
+
+    if (resolvedIndustry.length < 2) {
+      form.setError("industryType", { message: "Industry type is required" });
+      return;
+    }
     
     try {
       const batch = writeBatch(db);
@@ -131,6 +161,7 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
 
       const updateData = {
         ...values,
+        industryType: resolvedIndustry,
         expirationDate: Timestamp.fromDate(finalExpiration),
       };
       
@@ -292,9 +323,43 @@ export function EditMoaDialog({ moa, open, onOpenChange }: EditMoaDialogProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="font-bold text-xs uppercase tracking-wider text-slate-500">Industry Segment</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. Telecommunications" {...field} />
-                    </FormControl>
+                    <Select
+                      value={selectedIndustry}
+                      onValueChange={(value) => {
+                        setSelectedIndustry(value);
+                        if (value === OTHER_INDUSTRY_VALUE) {
+                          field.onChange(otherIndustry);
+                          return;
+                        }
+                        setOtherIndustry("");
+                        field.onChange(value);
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select industry" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {normalizedIndustryOptions.map((industry) => (
+                          <SelectItem key={industry} value={industry}>{industry}</SelectItem>
+                        ))}
+                        <SelectItem value={OTHER_INDUSTRY_VALUE}>Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {selectedIndustry === OTHER_INDUSTRY_VALUE && (
+                      <FormControl>
+                        <Input
+                          placeholder="Enter industry"
+                          value={otherIndustry}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setOtherIndustry(value);
+                            field.onChange(value);
+                          }}
+                        />
+                      </FormControl>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
