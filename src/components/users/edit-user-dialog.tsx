@@ -31,10 +31,10 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useFirestore } from "@/firebase";
-import { doc, setDoc, deleteDoc } from "firebase/firestore";
+import { doc } from "firebase/firestore";
 import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { useToast } from "@/hooks/use-toast";
-import { User, UserRole } from "@/lib/mock-data";
+import { User } from "@/lib/mock-data";
 
 const userFormSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -77,16 +77,17 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
     if (!user || !db) return;
     
     try {
+      if (values.role !== user.role && (values.role === "ADMIN" || user.role === "ADMIN")) {
+        toast({
+          variant: "destructive",
+          title: "Admin Role Is Server-Managed",
+          description: "Use the secure admin bootstrap flow to grant or revoke admin access.",
+        });
+        return;
+      }
+
       const docRef = doc(db, "users", user.id);
       updateDocumentNonBlocking(docRef, values);
-      
-      // Manage roles_admin collection for security rules
-      const adminDocRef = doc(db, "roles_admin", user.id);
-      if (values.role === 'ADMIN') {
-        await setDoc(adminDocRef, { uid: user.id }, { merge: true });
-      } else if (user.role === 'ADMIN' && values.role !== 'ADMIN') {
-        await deleteDoc(adminDocRef);
-      }
 
       toast({
         title: "Profile Updated",
@@ -141,13 +142,13 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="ADMIN">System Administrator</SelectItem>
+                        <SelectItem value="ADMIN" disabled>System Administrator (Server Managed)</SelectItem>
                       <SelectItem value="FACULTY">Faculty Member</SelectItem>
                       <SelectItem value="STUDENT">Student Access</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormDescription className="text-[10px] leading-tight mt-1">
-                    Admins have full control. Faculty can be granted edit rights. Students are read-only.
+                      Admin elevation is restricted to the secure bootstrap process. Faculty can be granted edit rights. Students are read-only.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

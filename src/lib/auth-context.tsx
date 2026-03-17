@@ -21,7 +21,6 @@ type AuthContextType = {
   loginWithGoogle: () => Promise<void>;
   loginAsPrototype: (role: 'ADMIN' | 'FACULTY' | 'STUDENT') => Promise<void>;
   logout: () => Promise<void>;
-  promoteToAdmin: () => Promise<void>;
   isLoading: boolean;
 };
 
@@ -33,28 +32,9 @@ const PROTOTYPE_ACCOUNTS: Record<'ADMIN' | 'FACULTY' | 'STUDENT', { email: strin
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Recognized Admin Emails
-const ADMIN_EMAILS = [
-  'johnmarc.sanchez@neu.edu.ph', 
-  'johnmarc@neu.edu.ph',
-  'admin@neu.edu.ph'
-];
-
-// Recognized Faculty Emails
-const FACULTY_EMAILS = [
-  'faculty@neu.edu.ph',
-  'professor@neu.edu.ph'
-];
-
 function resolveRoleFromEmail(email: string): { role: UserRole; canEdit: boolean } {
-  if (ADMIN_EMAILS.some((knownEmail) => knownEmail.toLowerCase() === email)) {
-    return { role: 'ADMIN', canEdit: true };
-  }
-
-  if (FACULTY_EMAILS.some((knownEmail) => knownEmail.toLowerCase() === email)) {
-    return { role: 'FACULTY', canEdit: true };
-  }
-
+  // Role elevation is server-managed. New Google users always bootstrap as STUDENT.
+  void email;
   return { role: 'STUDENT', canEdit: false };
 }
 
@@ -163,13 +143,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await setDoc(userRef, synchronizedUser, { merge: true });
       }
 
-      if (synchronizedUser.role === 'ADMIN') {
-        await setDoc(doc(db, 'roles_admin', firebaseUser.uid), {
-          uid: firebaseUser.uid,
-          email: authenticatedEmail,
-        }, { merge: true });
-      }
-
       if (options?.showSuccessToast) {
         toast({
           title: 'Access Granted',
@@ -192,13 +165,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const batch = writeBatch(db);
     batch.set(userRef, bootstrapUser, { merge: true });
-
-    if (role === 'ADMIN') {
-      batch.set(doc(db, 'roles_admin', firebaseUser.uid), {
-        uid: firebaseUser.uid,
-        email: authenticatedEmail,
-      }, { merge: true });
-    }
 
     await batch.commit();
 
@@ -336,25 +302,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/login');
   };
 
-  const promoteToAdmin = async () => {
-    if (!user) return;
-
-    const batch = writeBatch(db);
-    batch.update(doc(db, 'users', user.id), { role: 'ADMIN', canEdit: true });
-    batch.set(doc(db, 'roles_admin', user.id), { uid: user.id }, { merge: true });
-    await batch.commit();
-
-    const promotedUser = { ...user, role: 'ADMIN' as UserRole, canEdit: true };
-    setUser(promotedUser);
-
-    toast({
-      title: 'Elevated to Admin',
-      description: 'You now have full system control.',
-    });
-  };
-
   return (
-    <AuthContext.Provider value={{ user, loginWithGoogle, loginAsPrototype, logout, promoteToAdmin, isLoading }}>
+    <AuthContext.Provider value={{ user, loginWithGoogle, loginAsPrototype, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

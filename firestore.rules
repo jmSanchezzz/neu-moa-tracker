@@ -9,8 +9,16 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isAdmin() {
+    function hasAdminClaim() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function hasAdminRegistry() {
       return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return hasAdminClaim() || hasAdminRegistry();
     }
 
     function isAuthorizedFaculty() {
@@ -36,6 +44,23 @@ service cloud.firestore {
       return isPrototypeUser() || !exists(userPath) || get(userPath).data.isBlocked != true;
     }
 
+    function isPrototypeSelf(userId) {
+      return isPrototypeUser() && request.auth.uid == userId;
+    }
+
+    function isSelfSafeUpdate() {
+      return request.resource.data.role == resource.data.role &&
+             request.resource.data.canEdit == resource.data.canEdit &&
+             request.resource.data.isBlocked == resource.data.isBlocked;
+    }
+
+    function isSelfSafeCreate() {
+      return request.resource.data.id == request.auth.uid &&
+             request.resource.data.role == 'STUDENT' &&
+             request.resource.data.canEdit == false &&
+             request.resource.data.isBlocked == false;
+    }
+
     function validateStatus(data) {
       let pStatus = data.primaryStatus;
       let sStatus = data.subStatus;
@@ -50,13 +75,23 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow list: if isAdmin();
-      allow create, update: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
+
+      // Prototype access remains app-controlled for demo sessions.
+      allow create: if isPrototypeSelf(userId) ||
+                    isAdmin() ||
+                    (isSignedIn() && request.auth.uid == userId && isSelfSafeCreate());
+
+      allow update: if isPrototypeSelf(userId) ||
+                    isAdmin() ||
+                    (isSignedIn() && request.auth.uid == userId && isSelfSafeUpdate());
       allow delete: if isAdmin();
     }
 
     match /roles_admin/{userId} {
       allow get: if isSignedIn() && request.auth.uid == userId;
-      allow create, update: if isSignedIn() && request.auth.uid == userId;
+
+      // Client writes are only allowed for prototype self-provisioning.
+      allow create, update: if isPrototypeSelf(userId);
       allow list, delete: if isAdmin(); 
     }
 
@@ -71,12 +106,12 @@ service cloud.firestore {
     }
 
     match /audit_logs/{auditLogId} {
-      allow read, write: if isAdmin();
+      allow read, write: if isAdmin() && !isPrototypeUser();
     }
 
     match /system_config/{docId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow write: if isAdmin() && !isPrototypeUser();
     }
   }
 }
