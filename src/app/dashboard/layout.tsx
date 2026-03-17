@@ -3,6 +3,7 @@
 import { useAuth } from "@/lib/auth-context";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
+import { UserDropdown } from "@/components/dashboard/user-dropdown";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Separator } from "@/components/ui/separator";
@@ -25,6 +26,22 @@ export default function DashboardLayout({
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  const isStudent = user.role === 'STUDENT';
+
+  if (isStudent) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b px-4 md:px-8">
+          <h1 className="text-lg font-semibold text-primary">NEU MOA Monitoring</h1>
+          <UserDropdown />
+        </header>
+        <div className="flex flex-1 flex-col gap-4 p-4 md:p-8">
+          {children}
+        </div>
       </div>
     );
   }

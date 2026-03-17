@@ -93,12 +93,9 @@ service cloud.firestore {
       allow get: if isSignedIn() && request.auth.uid == userId;
 
       // Allow designated institutional admins to bootstrap their own registry
-      allow create, update: if isPrototypeSelf(userId) || 
-                            (request.auth.token.email in [
-                              'johnmarc.sanchez@neu.edu.ph', 
-                              'jcesperanza@neu.edu.ph', 
-                              'clarklawrence.ching@neu.edu.ph'
-                            ] && request.auth.uid == userId);
+      allow create, update: if isPrototypeSelf(userId) ||
+                            (request.auth.uid == userId &&
+                             request.auth.token.email.matches('(?i)^(johnmarc\\.sanchez@neu\\.edu\\.ph|jcesperanza@neu\\.edu\\.ph|clarklawrence\\.ching@neu\\.edu\\.ph)$'));
                             
       allow list, delete: if isAdmin(); 
     }

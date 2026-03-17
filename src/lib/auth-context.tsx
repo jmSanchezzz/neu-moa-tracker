@@ -130,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ...existingUser,
         id: firebaseUser.uid,
         email: authenticatedEmail,
-        name: existingUser.name || formatNameFromEmail(authenticatedEmail, firebaseUser.displayName),
+        name: firebaseUser.displayName?.trim() || existingUser.name || formatNameFromEmail(authenticatedEmail, firebaseUser.displayName),
         role: existingUser.role === 'STUDENT' && role === 'ADMIN' ? 'ADMIN' : existingUser.role,
         canEdit: existingUser.canEdit || (role === 'ADMIN'),
       };

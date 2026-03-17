@@ -105,7 +105,7 @@ export default function MoasPage() {
             ) : "MOA Records"}
           </h2>
           <p className="text-muted-foreground">
-            {isArchiveView ? "Archived records that have been soft-deleted." : "Search and manage institutional agreements."}
+            {isArchiveView ? "Archived records that have been soft-deleted." : ""}
           </p>
         </div>
         <div className="flex gap-2">
