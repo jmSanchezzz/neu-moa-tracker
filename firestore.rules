@@ -115,8 +115,8 @@ service cloud.firestore {
 
     match /audit_logs/{auditLogId} {
       allow read: if isAdmin();
-      // Writing to audit logs is restricted to server-side logic or Admins
-      allow write: if isAdmin();
+      // Allow audited writes from trusted editors while preserving admin-only visibility.
+      allow write: if isAdmin() || isAuthorizedFaculty();
     }
 
     match /system_config/{docId} {

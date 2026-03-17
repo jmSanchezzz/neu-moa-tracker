@@ -185,7 +185,7 @@ export function AddMoaDialog({ children, industryOptions = [] }: AddMoaDialogPro
                     if (val === 'PROCESSING') form.setValue('subStatus', 'AWAITING_HTE_SIGNATURE');
                     if (val === 'APPROVED') form.setValue('subStatus', 'SIGNED_BY_PRESIDENT');
                     if (val === 'EXPIRED') form.setValue('subStatus', 'NO_RENEWAL_DONE');
-                  }} defaultValue={field.value}>
+                  }} value={field.value}>
                     <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                     <SelectContent>
                       <SelectItem value="PROCESSING">Processing</SelectItem>
@@ -228,14 +228,41 @@ export function AddMoaDialog({ children, industryOptions = [] }: AddMoaDialogPro
               <FormItem>
                 <FormLabel className="font-bold text-xs uppercase text-slate-500">Company Name</FormLabel>
                 <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
               </FormItem>
             )} />
+
+            <FormField control={form.control} name="companyAddress" render={({ field }) => (
+              <FormItem>
+                <FormLabel className="font-bold text-xs uppercase text-slate-500">Company Address</FormLabel>
+                <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="contactPerson" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-bold text-xs uppercase text-slate-500">Contact Person</FormLabel>
+                  <FormControl><Input {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="contactPersonEmail" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-bold text-xs uppercase text-slate-500">Contact Email</FormLabel>
+                  <FormControl><Input type="email" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="hteId" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="font-bold text-xs uppercase text-slate-500">HTE ID</FormLabel>
                   <FormControl><Input {...field} /></FormControl>
+                  <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="industryType" render={({ field }) => (
@@ -284,12 +311,14 @@ export function AddMoaDialog({ children, industryOptions = [] }: AddMoaDialogPro
                 <FormItem>
                   <FormLabel className="font-bold text-xs uppercase text-slate-500">Effective Date</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
+                  <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="expirationDate" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="font-bold text-xs uppercase text-slate-500">Expiration Date (Default 2 Years)</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
+                  <FormMessage />
                 </FormItem>
               )} />
             </div>
@@ -297,12 +326,13 @@ export function AddMoaDialog({ children, industryOptions = [] }: AddMoaDialogPro
             <FormField control={form.control} name="college" render={({ field }) => (
               <FormItem>
                 <FormLabel className="font-bold text-xs uppercase text-slate-500">Endorsing College</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl><SelectTrigger><SelectValue placeholder="Select college" /></SelectTrigger></FormControl>
                   <SelectContent>
                     {NEU_COLLEGES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <FormMessage />
               </FormItem>
             )} />
 
