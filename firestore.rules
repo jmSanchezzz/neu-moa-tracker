@@ -28,8 +28,7 @@ service cloud.firestore {
              get(userPath).data.canEdit == true;
     }
 
-    // Prototype accounts sign in anonymously. Firebase reports sign_in_provider as
-    // either 'anonymous' (standard) or 'custom' (emulator / App Hosting environments).
+    // Prototype accounts sign in anonymously.
     function isPrototypeUser() {
       return isSignedIn() && (
         request.auth.token.firebase.sign_in_provider == 'anonymous' ||
@@ -38,9 +37,8 @@ service cloud.firestore {
     }
 
     function isNotBlocked() {
-      // Prototype (anonymous) users skip the cross-document check — they are
-      // app-controlled and an isBlocked flag on them has no meaning in this flow.
       let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      // New users (not yet in the users collection) are allowed to read MOAs to see the directory
       return isPrototypeUser() || !exists(userPath) || get(userPath).data.isBlocked != true;
     }
 
@@ -49,12 +47,14 @@ service cloud.firestore {
     }
 
     function isSelfSafeUpdate() {
+      // Prevents users from promoting themselves or unblocking themselves
       return request.resource.data.role == resource.data.role &&
              request.resource.data.canEdit == resource.data.canEdit &&
              request.resource.data.isBlocked == resource.data.isBlocked;
     }
 
     function isSelfSafeCreate() {
+      // Ensures new self-registered users are always read-only students
       return request.resource.data.id == request.auth.uid &&
              request.resource.data.role == 'STUDENT' &&
              request.resource.data.canEdit == false &&
@@ -76,22 +76,26 @@ service cloud.firestore {
       allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow list: if isAdmin();
 
-      // Prototype access remains app-controlled for demo sessions.
+      // Users can create their own profile as STUDENT, or Admins can create any profile
       allow create: if isPrototypeSelf(userId) ||
                     isAdmin() ||
                     (isSignedIn() && request.auth.uid == userId && isSelfSafeCreate());
 
+      // Users can update their own non-permission fields, or Admins can update anything
       allow update: if isPrototypeSelf(userId) ||
                     isAdmin() ||
                     (isSignedIn() && request.auth.uid == userId && isSelfSafeUpdate());
+                    
       allow delete: if isAdmin();
     }
 
     match /roles_admin/{userId} {
       allow get: if isSignedIn() && request.auth.uid == userId;
 
-      // Client writes are only allowed for prototype self-provisioning.
-      allow create, update: if isPrototypeSelf(userId);
+      // Allow the designated root admin email to bootstrap their own admin record via Google
+      allow create, update: if isPrototypeSelf(userId) || 
+                            (request.auth.token.email == 'johnmarc.sanchez@neu.edu.ph' && request.auth.uid == userId);
+                            
       allow list, delete: if isAdmin(); 
     }
 
@@ -106,12 +110,14 @@ service cloud.firestore {
     }
 
     match /audit_logs/{auditLogId} {
-      allow read, write: if isAdmin() && !isPrototypeUser();
+      allow read: if isAdmin();
+      // Writing to audit logs is restricted to server-side logic or Admins
+      allow write: if isAdmin();
     }
 
     match /system_config/{docId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() && !isPrototypeUser();
+      allow write: if isAdmin();
     }
   }
 }
