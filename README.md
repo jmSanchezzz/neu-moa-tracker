@@ -4,6 +4,9 @@ NEU MOA Tracker is a web-based Memorandum of Agreement (MOA) management system d
 
 Built with Next.js and Firebase, the system transitions MOA management from scattered records to a secure, role-based digital environment. It provides university administrators and faculty with the tools needed to track active agreements, monitor expiration dates, and maintain a clear audit trail of all partnership activities.
 
+## Live Demo
+## https://neu-moa-tracker.vercel.app
+
 ## Core Features
 
 * **Role-Based Access Control (RBAC):** Secure access tiers via `@neu.edu.ph` Google Sign-In, ensuring Admin, Faculty, and Student users only interact with appropriate data.
