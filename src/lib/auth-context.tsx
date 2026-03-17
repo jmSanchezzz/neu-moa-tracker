@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
@@ -24,6 +23,11 @@ type AuthContextType = {
   isLoading: boolean;
 };
 
+const ADMIN_EMAILS = [
+  'johnmarc.sanchez@neu.edu.ph',
+  'jcesperanza@neu.edu.ph'
+];
+
 const PROTOTYPE_ACCOUNTS: Record<'ADMIN' | 'FACULTY' | 'STUDENT', { email: string; name: string; role: UserRole; canEdit: boolean }> = {
   ADMIN:   { email: 'admin@neu.edu.ph',   name: 'Admin User',   role: 'ADMIN',   canEdit: true  },
   FACULTY: { email: 'faculty@neu.edu.ph', name: 'Faculty User', role: 'FACULTY', canEdit: true  },
@@ -33,8 +37,10 @@ const PROTOTYPE_ACCOUNTS: Record<'ADMIN' | 'FACULTY' | 'STUDENT', { email: strin
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 function resolveRoleFromEmail(email: string): { role: UserRole; canEdit: boolean } {
-  // Role elevation is server-managed. New Google users always bootstrap as STUDENT.
-  void email;
+  const normalizedEmail = email.toLowerCase().trim();
+  if (ADMIN_EMAILS.includes(normalizedEmail)) {
+    return { role: 'ADMIN', canEdit: true };
+  }
   return { role: 'STUDENT', canEdit: false };
 }
 
@@ -69,7 +75,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       showSuccessToast?: boolean;
     }
   ) => {
-    // Prototype accounts sign in anonymously — restore their session from Firestore
     if (firebaseUser.isAnonymous) {
       const userRef = doc(db, 'users', firebaseUser.uid);
       const userDoc = await getDoc(userRef);
@@ -102,18 +107,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return null;
     }
 
-    if (options?.expectedEmail && authenticatedEmail !== options.expectedEmail) {
-      await signOut(auth);
-      toast({
-        variant: 'destructive',
-        title: 'Account Mismatch',
-        description: `Select ${options.expectedEmail} in Google Sign-In to continue.`,
-      });
-      return null;
-    }
-
     const userRef = doc(db, 'users', firebaseUser.uid);
     const userDoc = await getDoc(userRef);
+    const { role, canEdit } = resolveRoleFromEmail(authenticatedEmail);
 
     if (userDoc.exists()) {
       const existingUser = userDoc.data() as User;
@@ -133,15 +129,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: firebaseUser.uid,
         email: authenticatedEmail,
         name: existingUser.name || formatNameFromEmail(authenticatedEmail, firebaseUser.displayName),
+        role: existingUser.role === 'STUDENT' && role === 'ADMIN' ? 'ADMIN' : existingUser.role,
+        canEdit: existingUser.canEdit || (role === 'ADMIN'),
       };
 
-      if (
-        existingUser.id !== synchronizedUser.id ||
-        existingUser.email !== synchronizedUser.email ||
-        existingUser.name !== synchronizedUser.name
-      ) {
-        await setDoc(userRef, synchronizedUser, { merge: true });
+      const batch = writeBatch(db);
+      batch.set(userRef, synchronizedUser, { merge: true });
+      
+      if (synchronizedUser.role === 'ADMIN') {
+        const adminRef = doc(db, 'roles_admin', firebaseUser.uid);
+        batch.set(adminRef, { uid: firebaseUser.uid, email: authenticatedEmail }, { merge: true });
       }
+
+      await batch.commit();
 
       if (options?.showSuccessToast) {
         toast({
@@ -153,7 +153,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return synchronizedUser;
     }
 
-    const { role, canEdit } = resolveRoleFromEmail(authenticatedEmail);
     const bootstrapUser: User = {
       id: firebaseUser.uid,
       name: formatNameFromEmail(authenticatedEmail, firebaseUser.displayName),
@@ -165,6 +164,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const batch = writeBatch(db);
     batch.set(userRef, bootstrapUser, { merge: true });
+    
+    if (role === 'ADMIN') {
+      const adminRef = doc(db, 'roles_admin', firebaseUser.uid);
+      batch.set(adminRef, { uid: firebaseUser.uid, email: authenticatedEmail }, { merge: true });
+    }
 
     await batch.commit();
 
@@ -229,26 +233,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error: any) {
       console.error('Login error:', error);
-
-      if (error?.code === 'auth/popup-closed-by-user') {
-        toast({
-          variant: 'destructive',
-          title: 'Sign-In Cancelled',
-          description: 'Google Sign-In was closed before authentication completed.',
-        });
-      } else if (error?.code === 'auth/cancelled-popup-request') {
-        toast({
-          variant: 'destructive',
-          title: 'Sign-In Interrupted',
-          description: 'A previous Google sign-in attempt was interrupted. Please try again.',
-        });
-      } else {
-        toast({
-          variant: 'destructive',
-          title: 'System Error',
-          description: 'Google authentication failed. Please try again.',
-        });
-      }
+      toast({
+        variant: 'destructive',
+        title: 'System Error',
+        description: 'Google authentication failed. Please try again.',
+      });
     } finally {
       loginInProgressRef.current = false;
       setIsLoading(false);
