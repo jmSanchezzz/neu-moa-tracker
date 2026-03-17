@@ -94,7 +94,11 @@ service cloud.firestore {
 
       // Allow designated institutional admins to bootstrap their own registry
       allow create, update: if isPrototypeSelf(userId) || 
-                            (request.auth.token.email in ['johnmarc.sanchez@neu.edu.ph', 'jcesperanza@neu.edu.ph'] && request.auth.uid == userId);
+                            (request.auth.token.email in [
+                              'johnmarc.sanchez@neu.edu.ph', 
+                              'jcesperanza@neu.edu.ph', 
+                              'clarklawrence.ching@neu.edu.ph'
+                            ] && request.auth.uid == userId);
                             
       allow list, delete: if isAdmin(); 
     }

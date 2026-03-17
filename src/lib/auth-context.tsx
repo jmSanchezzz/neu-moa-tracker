@@ -26,7 +26,8 @@ type AuthContextType = {
 
 const ADMIN_EMAILS = [
   'johnmarc.sanchez@neu.edu.ph',
-  'jcesperanza@neu.edu.ph'
+  'jcesperanza@neu.edu.ph',
+  'clarklawrence.ching@neu.edu.ph'
 ];
 
 const PROTOTYPE_ACCOUNTS: Record<'ADMIN' | 'FACULTY' | 'STUDENT', { email: string; name: string; role: UserRole; canEdit: boolean }> = {
